@@ -18,35 +18,38 @@ const requestJson = async (path, options, fallbackMessage) => {
   return data;
 };
 
-export const loginRequest = async (email, password) => {
-  return requestJson('/auth/login', {
+export const loginRequest = (email, password) =>
+  requestJson('/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   }, 'No se pudo iniciar sesión');
-};
 
-export const registerRequest = async (payload) => {
-  return requestJson('/auth/register', {
+export const registerRequest = (payload) =>
+  requestJson('/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   }, 'No se pudo registrar el usuario');
-};
 
-export const fetchProfile = async (token) => {
-  return requestJson('/auth/profile', {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+export const fetchProfile = (token) =>
+  requestJson('/auth/profile', {
+    headers: { Authorization: `Bearer ${token}` },
   }, 'No se pudo cargar el perfil');
-};
 
-export const logoutRequest = async (token) => {
-  return requestJson('/auth/logout', {
+export const refreshRequest = (refreshToken) =>
+  requestJson('/auth/refresh', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken }),
+  }, 'No se pudo renovar la sesión');
+
+export const logoutRequest = (token, refreshToken) =>
+  requestJson('/auth/logout', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
+    body: JSON.stringify({ refreshToken }),
   }, 'No se pudo cerrar la sesión en el servidor');
-};

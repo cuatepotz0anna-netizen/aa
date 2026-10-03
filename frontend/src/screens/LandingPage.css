@@ -212,7 +212,7 @@
   margin-top: 27px;
 }
 
-.button {
+.marketing-site .button {
   display: inline-flex;
   min-height: 48px;
   align-items: center;
@@ -225,26 +225,26 @@
   transition: background-color 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
 
-.button:hover {
+.marketing-site .button:hover {
   transform: translateY(-2px);
 }
 
-.button-wine {
+.marketing-site .button-wine {
   color: #fff !important;
   background: var(--marketing-berry);
   box-shadow: 0 9px 22px rgb(189 71 124 / 22%);
 }
 
-.button-wine:hover {
+.marketing-site .button-wine:hover {
   background: #a83a6d;
   box-shadow: 0 12px 25px rgb(189 71 124 / 27%);
 }
 
-.button-text {
+.marketing-site .button-text {
   color: var(--marketing-wine);
 }
 
-.button-text:hover {
+.marketing-site .button-text:hover {
   color: var(--marketing-berry);
 }
 
@@ -1071,12 +1071,12 @@
   gap: 13px;
 }
 
-.button-light {
+.marketing-site .button-light {
   color: var(--marketing-wine) !important;
   background: #fffafd;
 }
 
-.button-light:hover {
+.marketing-site .button-light:hover {
   background: #fff;
 }
 

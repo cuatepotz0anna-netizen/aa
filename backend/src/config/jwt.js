@@ -1,8 +1,12 @@
 const isProduction = process.env.NODE_ENV === 'production';
-const JWT_SECRET = process.env.JWT_SECRET || (isProduction ? null : 'dev_secret_change_me');
+const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET must be configured in production');
+  throw new Error('JWT_SECRET must be configured in the environment');
+}
+
+if (isProduction && Buffer.byteLength(JWT_SECRET, 'utf8') < 32) {
+  throw new Error('JWT_SECRET must be at least 32 bytes in production');
 }
 
 module.exports = {

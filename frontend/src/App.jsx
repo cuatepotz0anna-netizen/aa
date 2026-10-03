@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import LandingPage from './screens/LandingPage';
+import DashboardView, { CustomersView } from './screens/CustomerInsights';
 
 const navigationGroups = [
   {
@@ -33,62 +34,8 @@ const navigationGroups = [
 ];
 
 const moduleRoutes = navigationGroups.flatMap(({ items }) => items)
-  .filter(({ to }) => to !== '/dashboard')
+  .filter(({ to }) => to !== '/dashboard' && to !== '/clientes')
   .map(({ to, label, roles }) => ({ path: to.slice(1), label, roles }));
-
-const metrics = [
-  { label: 'Ventas del periodo', detail: 'Sin datos conectados' },
-  { label: 'Compras', detail: 'Sin datos conectados' },
-  { label: 'Clientes', detail: 'Sin datos conectados' },
-  { label: 'Stock bajo', detail: 'Sin datos conectados' },
-];
-
-function Dashboard() {
-  return (
-    <div className="page-content">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">RESUMEN OPERATIVO</p>
-          <h1>Dashboard</h1>
-          <p className="page-description">Vista general de la operación de Apta Digital.</p>
-        </div>
-      </div>
-
-      <section className="metric-grid" aria-label="Indicadores principales">
-        {metrics.map((metric) => (
-          <article className="metric-panel" key={metric.label}>
-            <p className="metric-label">{metric.label}</p>
-            <p className="metric-value" aria-label="Sin datos">—</p>
-            <p className="metric-detail">{metric.detail}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="dashboard-grid">
-        <article className="content-panel activity-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Actividad reciente</h2>
-              <p>Movimientos registrados en el sistema</p>
-            </div>
-          </div>
-          <div className="empty-state">
-            <span className="empty-state-mark" aria-hidden="true">—</span>
-            <h3>Sin actividad disponible</h3>
-            <p>La actividad aparecerá aquí cuando los módulos estén conectados.</p>
-          </div>
-        </article>
-
-        <article className="content-panel setup-panel">
-          <p className="eyebrow">ESTADO DEL ERP</p>
-          <h2>Información del sistema</h2>
-          <p>Los indicadores se mostrarán cuando sus módulos y datos estén disponibles.</p>
-          <NavLink className="text-link" to="/health">Ver estado de la API</NavLink>
-        </article>
-      </section>
-    </div>
-  );
-}
 
 function ModulePlaceholder({ title }) {
   return (
@@ -218,25 +165,32 @@ function WorkspaceLayout() {
 }
 
 export default function App() {
-  const { user, token, isInitializing } = useAuth();
+  const { status } = useAuth();
 
-  if (isInitializing) {
-    return null;
+  if (status === 'loading') {
+    return <div className="session-loading" role="status">Validando sesión...</div>;
   }
+
+  const isAuthenticated = status === 'authenticated';
 
   return (
     <Routes>
       <Route
         path="/"
-        element={
-          user && token ? <Navigate replace to="/dashboard" /> : <Navigate replace to="/login" />
-        }
+        element={<Navigate replace to={isAuthenticated ? '/dashboard' : '/login'} />}
       />
       <Route path="/inicio" element={<LandingPage />} />
-      <Route path="/login" element={<LoginScreen />} />
-      <Route path="/register" element={<RegisterScreen />} />
+      <Route
+        path="/login"
+        element={isAuthenticated ? <Navigate replace to="/dashboard" /> : <LoginScreen />}
+      />
+      <Route
+        path="/register"
+        element={isAuthenticated ? <Navigate replace to="/dashboard" /> : <RegisterScreen />}
+      />
       <Route element={<ProtectedRoute><WorkspaceLayout /></ProtectedRoute>}>
-        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="dashboard" element={<DashboardView />} />
+        <Route path="clientes" element={<CustomersView />} />
         <Route path="health" element={<Health />} />
         {moduleRoutes.map((module) => (
           <Route

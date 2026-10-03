@@ -1,61 +1,84 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { fetchProfile, logoutRequest } from '../services/authService';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { fetchProfile, logoutRequest, refreshRequest } from '../services/authService';
 
 const AuthContext = createContext();
 
-const getStoredUser = () => {
-  try {
-    const raw = localStorage.getItem('erp-user');
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
-const getStoredToken = () => localStorage.getItem('erp-token') || null;
-
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(getStoredUser());
-  const [token, setToken] = useState(getStoredToken());
-  const [isInitializing, setIsInitializing] = useState(true);
-
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('erp-user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('erp-user');
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem('erp-token', token);
-    } else {
-      localStorage.removeItem('erp-token');
-    }
-  }, [token]);
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [refreshToken, setRefreshToken] = useState(null);
+  const [status, setStatus] = useState('loading');
 
   useEffect(() => {
     let isCurrent = true;
 
-    const restoreSession = async () => {
-      if (!token) {
-        setUser(null);
-        setIsInitializing(false);
-        return;
+    const saveSession = (accessToken, nextRefreshToken, profileUser) => {
+      if (!accessToken || !profileUser) {
+        throw new Error('La respuesta de autenticación está incompleta');
+      }
+      if (!isCurrent) return;
+
+      localStorage.setItem('erp-token', accessToken);
+      localStorage.setItem('erp-user', JSON.stringify(profileUser));
+      if (nextRefreshToken) {
+        localStorage.setItem('erp-refresh-token', nextRefreshToken);
+      } else {
+        localStorage.removeItem('erp-refresh-token');
       }
 
-      setIsInitializing(true);
-      try {
-        const response = await fetchProfile(token);
-        if (isCurrent) setUser(response.data.user);
-      } catch {
+      setToken(accessToken);
+      setRefreshToken(nextRefreshToken || null);
+      setUser(profileUser);
+      setStatus('authenticated');
+    };
+
+    const restoreSession = async () => {
+      const storedToken = localStorage.getItem('erp-token');
+      const storedRefreshToken = localStorage.getItem('erp-refresh-token');
+
+      if (!storedToken && !storedRefreshToken) {
+        localStorage.removeItem('erp-user');
         if (isCurrent) {
           setUser(null);
           setToken(null);
+          setRefreshToken(null);
+          setStatus('unauthenticated');
         }
-      } finally {
-        if (isCurrent) setIsInitializing(false);
+        return;
+      }
+
+      try {
+        let accessToken = storedToken;
+        let nextRefreshToken = storedRefreshToken;
+        let profileUser;
+
+        if (storedToken) {
+          try {
+            const profileResponse = await fetchProfile(storedToken);
+            profileUser = profileResponse?.data?.user;
+          } catch (error) {
+            if (!storedRefreshToken) throw error;
+          }
+        }
+
+        if (!profileUser && storedRefreshToken) {
+          const refreshed = await refreshRequest(storedRefreshToken);
+          accessToken = refreshed?.data?.accessToken || refreshed?.data?.token;
+          nextRefreshToken = refreshed?.data?.refreshToken;
+          profileUser = refreshed?.data?.user;
+        }
+
+        saveSession(accessToken, nextRefreshToken, profileUser);
+      } catch {
+        if (isCurrent) {
+          localStorage.removeItem('erp-user');
+          localStorage.removeItem('erp-token');
+          localStorage.removeItem('erp-refresh-token');
+          setUser(null);
+          setToken(null);
+          setRefreshToken(null);
+          setStatus('unauthenticated');
+        }
       }
     };
 
@@ -63,30 +86,48 @@ export function AuthProvider({ children }) {
     return () => {
       isCurrent = false;
     };
-  }, [token]);
+  }, []);
+
+  const setSession = useCallback((nextToken, nextUser, nextRefreshToken) => {
+    if (!nextToken || !nextUser) {
+      throw new Error('La sesión requiere un token y un usuario');
+    }
+
+    localStorage.setItem('erp-token', nextToken);
+    localStorage.setItem('erp-user', JSON.stringify(nextUser));
+    if (nextRefreshToken) {
+      localStorage.setItem('erp-refresh-token', nextRefreshToken);
+    } else {
+      localStorage.removeItem('erp-refresh-token');
+    }
+    setToken(nextToken);
+    setRefreshToken(nextRefreshToken || null);
+    setUser(nextUser);
+    setStatus('authenticated');
+  }, []);
+
+  const logout = useCallback(async () => {
+    const currentToken = token;
+    const currentRefreshToken = refreshToken;
+
+    try {
+      if (currentToken) {
+        await logoutRequest(currentToken, currentRefreshToken);
+      }
+    } finally {
+      localStorage.removeItem('erp-user');
+      localStorage.removeItem('erp-token');
+      localStorage.removeItem('erp-refresh-token');
+      setUser(null);
+      setToken(null);
+      setRefreshToken(null);
+      setStatus('unauthenticated');
+    }
+  }, [token, refreshToken]);
 
   const value = useMemo(
-    () => ({
-      user,
-      token,
-      isInitializing,
-      setUser,
-      setToken,
-      logout: async () => {
-        const currentToken = token;
-        setUser(null);
-        setToken(null);
-        localStorage.removeItem('erp-user');
-        localStorage.removeItem('erp-token');
-
-        try {
-          if (currentToken) await logoutRequest(currentToken);
-        } catch {
-          // Local logout must still complete when the API is unavailable.
-        }
-      },
-    }),
-    [user, token, isInitializing]
+    () => ({ user, token, refreshToken, status, setSession, logout }),
+    [user, token, refreshToken, status, setSession, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

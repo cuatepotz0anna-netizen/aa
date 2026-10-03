@@ -1,15 +1,12 @@
 import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Brand from '../components/Brand';
 import { loginRequest } from '../services/authService';
 
 export default function LoginScreen() {
   const navigate = useNavigate();
-  const { user, token, setUser, setToken } = useAuth();
-  if (user && token) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  const { setSession } = useAuth();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,8 +23,11 @@ export default function LoginScreen() {
 
     try {
       const response = await loginRequest(form.email, form.password);
-      setToken(response.data.token);
-      setUser(response.data.user);
+      setSession(
+        response.data.accessToken || response.data.token,
+        response.data.user,
+        response.data.refreshToken
+      );
       navigate('/dashboard', { replace: true });
     } catch (err) {
       setError(err.message || 'No se pudo iniciar sesión');

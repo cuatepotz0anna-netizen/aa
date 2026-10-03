@@ -680,6 +680,16 @@ summary {
   font-size: 12px;
 }
 
+.error-message a {
+  color: #963963;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.error-message a:hover {
+  text-decoration: underline;
+}
+
 .button-spinner {
   width: 14px;
   height: 14px;
@@ -990,11 +1000,13 @@ summary {
   box-shadow: 0 22px 58px rgb(184 78 125 / 15%);
 }
 
-.auth-card .brand-mark {
+.auth-card .brand-mark,
+.button-primary {
   background: #b84e7d;
 }
 
-.auth-heading .eyebrow {
+.auth-heading .eyebrow,
+.auth-link a {
   color: #b84e7d;
 }
 
@@ -1021,13 +1033,11 @@ summary {
   box-shadow: 0 0 0 3px rgb(214 108 155 / 19%);
 }
 
-.visibility-toggle,
-.auth-link a {
+.visibility-toggle {
   color: #b84e7d;
 }
 
 .button-primary {
-  background: #b84e7d;
   box-shadow: 0 7px 16px rgb(184 78 125 / 22%);
 }
 
@@ -1047,4 +1057,11 @@ summary {
     border-radius: 9px;
     box-shadow: 0 15px 36px rgb(184 78 125 / 18%);
   }
+}
+
+.session-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  color: var(--ink);
 }

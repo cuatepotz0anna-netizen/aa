@@ -1,5 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const { seedRoles } = require('../modules/roles/role.seed');
+const { seedPermissions } = require('../modules/permissions/permission.seed');
+const { protect, authorize } = require('../middleware/auth');
 const router = express.Router();
 
 router.use('/auth', (req, res, next) => {
@@ -33,6 +36,19 @@ router.get('/ping', (req, res) => {
     message: 'ERP backend is reachable',
     data: { ok: true },
   });
+});
+
+router.get('/seed-defaults', protect, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    await seedRoles();
+    await seedPermissions();
+    return res.status(200).json({
+      success: true,
+      message: 'Default roles and permissions seeded successfully',
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 module.exports = router;

@@ -50,23 +50,23 @@ La equivalencia es solo de autorizacion; conserva los valores almacenados y no m
 
 - El registro publico asigna siempre `EMPLEADO`; ignora `role` y `tenantId` recibidos. No modifica ni migra usuarios existentes.
 - El access JWT contiene solo `sub`, `type` y expiracion; el middleware requiere `type: access`, `sub`, firma HS256 valida y expiracion valida. La autorizacion lee el rol y estado actuales del usuario desde MongoDB; los claims `role` enviados dentro del token no conceden privilegios.
-- En produccion, el backend falla al cargar la configuracion JWT si falta `JWT_SECRET`. El fallback local se conserva solo fuera de produccion para desarrollo/pruebas.
+- El backend requiere `JWT_SECRET` exclusivamente desde el entorno en todos los ambientes y falla al cargar la configuracion si falta. En produccion tambien exige una longitud minima de 32 bytes. No existe fallback codificado.
 - El router principal monta ahora `/api/users`. Lectura requiere `ADMIN` o `GERENTE`; `ADMIN` puede asignar roles en altas/ediciones; `GERENTE` solo puede crear `EMPLEADO`, editar nombre/correo y no puede asignar ambito organizacional ni desactivar usuarios. `PATCH /api/users/:id/deactivate` requiere `ADMIN`.
 - Los datos de usuario siguen serializandose sin contraseña. La prueba verifica almacenamiento bcrypt y que las respuestas de registro/login y listado no exponen el hash.
-- El frontend revalida el access token con `/api/auth/profile` al restaurar sesion, limpia la sesion local si falla y llama a `/api/auth/logout` al cerrar sesion. El logout frontend elimina siempre la sesion local aunque la API no responda; el backend revoca las sesiones del usuario cuando no recibe un refresh token.
+- El frontend persiste access y refresh tokens en `localStorage`, revalida el access token con `/api/auth/profile` al restaurar sesion y usa `/api/auth/refresh` si el access token ya no es valido. Si la restauracion falla, limpia la sesion local. Al cerrar sesion envia el refresh token a `/api/auth/logout` y elimina las credenciales locales incluso si falla la solicitud.
 - Las pantallas de usuarios se muestran a `ADMIN`/`GERENTE`; auditoria y configuracion solo a `ADMIN`. Son placeholders, no CRUD/interfaz de auditoria/configuracion. Estos guards son de UX; el backend sigue siendo la barrera de seguridad.
-- Validacion automatizada: `npm test` en backend, 2 suites y 16 pruebas aprobadas; `npm run build` en frontend, correcto.
+- Validacion automatizada: `npm test` en backend, 2 suites y 24 pruebas aprobadas; `npm run build` en frontend, correcto.
 - Verificacion navegador: `/login` renderiza. No se observaron errores JavaScript; React Router emitio avisos de compatibilidad futura.
-- Verificacion runtime durante esta auditoria: `/api/health` respondio 200, pero `databaseConnected` fue `false`. Por ello no se verifico login/perfil con Atlas en esta ejecucion. No se leyo `.env`, no se expusieron secretos ni se creo/eliminó un usuario real.
+- Verificacion runtime local: `/api/health` respondio 200 con `databaseConnected: true`. No se leyo `.env`, no se expusieron secretos ni se creo/eliminó un usuario real.
 
 ### Riesgos pendientes
 
 - `ADMINISTRADOR`, `SUPERVISOR` y `USUARIO` siguen siendo nombres objetivo documentados, no valores del enum. La equivalencia actual es `ADMIN`, `GERENTE` y `EMPLEADO`; cualquier migracion de nombres requiere plan de compatibilidad con los datos existentes.
 - El modelo/seed `Permission` no participa en autorizacion; el RBAC implementado es por rol en las rutas de usuarios.
 - `GERENTE` puede consultar/listar usuarios globalmente. No hay aislamiento por empresa/tenant en las rutas y no se incorporo en este paso.
-- Los access tokens siguen en `localStorage`, con riesgo ante XSS. El frontend no persiste ni rota refresh tokens; al no enviar refresh en logout, el endpoint actual revoca todas las sesiones del usuario.
+- Los access y refresh tokens se almacenan en `localStorage`, con riesgo ante XSS. Una mitigacion con cookies `HttpOnly` requiere un cambio de arquitectura y queda pendiente.
 - No hay endpoints reales de roles, permisos, auditoria, configuracion o modulos operativos. Los enlaces visibles no implican que esas capacidades estén implementadas.
-- La conexion MongoDB Atlas debe volver a confirmarse: la comprobacion runtime de este paso informó `databaseConnected: false`, aunque el estado inicial aportado por el usuario indicaba conexión correcta.
+- La conectividad con MongoDB Atlas debe verificarse en cada entorno de despliegue; la comprobacion local no garantiza la configuracion del entorno remoto.
 
 ## Funciones
 - Registro de usuarios

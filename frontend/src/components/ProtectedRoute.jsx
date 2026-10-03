@@ -2,17 +2,17 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function ProtectedRoute({ children, allowedRoles }) {
-  const { user, token, isInitializing } = useAuth();
+  const { user, status } = useAuth();
 
-  if (isInitializing) {
-    return null;
+  if (status === 'loading') {
+    return <div className="session-loading" role="status">Validando sesión...</div>;
   }
 
-  if (!user || !token) {
+  if (status !== 'authenticated') {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  if (allowedRoles && !allowedRoles.includes(user?.role)) {
     return <Navigate to="/dashboard" replace />;
   }
 
