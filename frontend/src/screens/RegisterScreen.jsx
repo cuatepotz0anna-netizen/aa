@@ -7,7 +7,7 @@ import Brand from '../components/Brand';
 export default function RegisterScreen() {
   const navigate = useNavigate();
   const { setSession } = useAuth();
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -18,11 +18,19 @@ export default function RegisterScreen() {
 
   const onSubmit = async (event) => {
     event.preventDefault();
+    if (form.password !== form.confirmPassword) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
     setLoading(true);
     setError('');
 
     try {
-      const response = await registerRequest(form);
+      const response = await registerRequest({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+      });
       setSession(
         response.data.accessToken || response.data.token,
         response.data.user,
@@ -45,7 +53,7 @@ export default function RegisterScreen() {
       <form className="auth-card" onSubmit={onSubmit} aria-busy={loading}>
         <Brand />
         <div className="auth-heading">
-          <p className="eyebrow">GESTIÓN EMPRESARIAL</p>
+          <p className="eyebrow">FOTO MINERVA · GESTIÓN DEL ESTUDIO</p>
           <h1>Crea tu cuenta</h1>
           <p>Regístrate para acceder a tu espacio de trabajo.</p>
         </div>
@@ -101,6 +109,20 @@ export default function RegisterScreen() {
             </button>
           </div>
         </div>
+        <div className="field-group">
+          <label htmlFor="register-confirm-password">Confirmar contraseña</label>
+          <input
+            className="form-input"
+            id="register-confirm-password"
+            name="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            placeholder="Repite tu contraseña"
+            value={form.confirmPassword}
+            onChange={onChange}
+            required
+          />
+        </div>
 
         {error ? (
           <p className="error-message" role="alert">
@@ -116,7 +138,7 @@ export default function RegisterScreen() {
         </button>
 
         <p className="auth-link">
-          ¿Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
+          ¿Ya tienes una cuenta? <Link to="/login">Iniciar sesión</Link>
         </p>
       </form>
     </div>

@@ -41,9 +41,9 @@ export default function LoginScreen() {
       <form className="auth-card" onSubmit={onSubmit} aria-busy={loading}>
         <Brand />
         <div className="auth-heading">
-          <p className="eyebrow">GESTIÓN EMPRESARIAL</p>
+          <p className="eyebrow">FOTO MINERVA · GESTIÓN DEL ESTUDIO</p>
           <h1>Bienvenido de nuevo</h1>
-          <p>Ingresa a tu espacio de trabajo.</p>
+          <p>Ingresa a Foto Minerva.</p>
         </div>
         <div className="field-group">
           <label htmlFor="login-email">Correo electrónico</label>

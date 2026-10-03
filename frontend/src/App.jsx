@@ -1,59 +1,23 @@
+import { useState } from 'react';
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Images, LayoutDashboard, Package, Users, UserCheck } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import LandingPage from './screens/LandingPage';
-import DashboardView, { CustomersView } from './screens/CustomerInsights';
+import Brand from './components/Brand';
+import { StudioDashboard, StudioModule } from './screens/StudioWorkspace';
 
-const navigationGroups = [
-  {
-    label: 'GENERAL',
-    items: [{ to: '/dashboard', label: 'Dashboard', end: true }],
-  },
-  {
-    label: 'OPERACIÓN',
-    items: [
-      { to: '/inventario', label: 'Inventario' },
-      { to: '/ventas', label: 'Ventas' },
-      { to: '/clientes', label: 'Clientes' },
-      { to: '/compras', label: 'Compras' },
-      { to: '/proveedores', label: 'Proveedores' },
-    ],
-  },
-  {
-    label: 'GESTIÓN',
-    items: [
-      { to: '/finanzas', label: 'Finanzas' },
-      { to: '/reportes', label: 'Reportes' },
-      { to: '/usuarios', label: 'Usuarios', roles: ['ADMIN', 'GERENTE'] },
-      { to: '/auditoria', label: 'Auditoría', roles: ['ADMIN'] },
-      { to: '/configuracion', label: 'Configuración', roles: ['ADMIN'] },
-    ],
-  },
+const navigationItems = [
+  { to: '/dashboard', label: 'Panel general', icon: LayoutDashboard, end: true },
+  { to: '/pedidos', label: 'Pedidos', icon: ClipboardList },
+  { to: '/productos', label: 'Productos', icon: Package },
+  { to: '/sesiones', label: 'Sesiones', icon: CalendarDays },
+  { to: '/impresiones', label: 'Impresiones', icon: Images },
+  { to: '/clientes', label: 'Clientes', icon: Users },
+  { to: '/asistencia', label: 'Asistencia', icon: UserCheck },
 ];
-
-const moduleRoutes = navigationGroups.flatMap(({ items }) => items)
-  .filter(({ to }) => to !== '/dashboard' && to !== '/clientes')
-  .map(({ to, label, roles }) => ({ path: to.slice(1), label, roles }));
-
-function ModulePlaceholder({ title }) {
-  return (
-    <div className="page-content">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">MÓDULO</p>
-          <h1>{title}</h1>
-        </div>
-      </div>
-      <section className="content-panel module-placeholder">
-        <span className="placeholder-mark" aria-hidden="true">{title.slice(0, 1)}</span>
-        <h2>{title}</h2>
-        <p>Este módulo se encuentra en configuración.</p>
-      </section>
-    </div>
-  );
-}
 
 function Health() {
   return (
@@ -79,67 +43,74 @@ function WorkspaceLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const currentPage = navigationGroups.flatMap(({ items }) => items)
-    .find(({ to }) => to === location.pathname)?.label || 'Estado de la API';
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('foto-minerva-sidebar-collapsed') === 'true');
+  const currentPage = navigationItems.find(({ to }) => to === location.pathname)?.label || 'Estado de la API';
   const displayName = user?.name || user?.email || 'Usuario';
   const initials = displayName.slice(0, 2).toUpperCase();
 
+  const toggleSidebar = () => {
+    setCollapsed((value) => {
+      localStorage.setItem('foto-minerva-sidebar-collapsed', String(!value));
+      return !value;
+    });
+  };
+
   const handleLogout = async () => {
-    await logout();
-    navigate('/login', { replace: true });
+    try {
+      await logout();
+    } finally {
+      navigate('/', { replace: true });
+    }
   };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${collapsed ? ' sidebar-collapsed' : ''}`}>
       <aside className="sidebar">
-        <NavLink className="brand-lockup sidebar-brand" to="/dashboard" aria-label="Apta Digital, Dashboard">
-          <span className="brand-mark" aria-hidden="true">AD</span>
-          <span className="brand-name">Apta <strong>Digital</strong></span>
-        </NavLink>
+        <div className="sidebar-brand-row">
+          <NavLink className="sidebar-brand" to="/dashboard" aria-label="Foto Minerva, panel general">
+            <Brand compact={collapsed} />
+          </NavLink>
+          <button className="sidebar-toggle" type="button" onClick={toggleSidebar} aria-label={collapsed ? 'Desplegar menú' : 'Contraer menú'} title={collapsed ? 'Desplegar menú' : 'Contraer menú'}>
+            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
+        </div>
 
         <nav className="primary-navigation" aria-label="Navegación principal">
-          {navigationGroups.map((group) => {
-            const visibleItems = group.items.filter(
-              (item) => !item.roles || item.roles.includes(user?.role)
-            );
-            if (visibleItems.length === 0) return null;
-
-            return (
-            <div className="navigation-group" key={group.label}>
-              <p className="navigation-label">{group.label}</p>
-              {visibleItems.map((item) => (
-                <NavLink
-                  className={({ isActive }) => `navigation-link${isActive ? ' is-active' : ''}`}
-                  end={item.end}
-                  key={item.to}
-                  to={item.to}
-                >
-                  <span className="navigation-indicator" aria-hidden="true" />
-                  {item.label}
-                </NavLink>
-              ))}
-            </div>
-            );
-          })}
+          {navigationItems.map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+              aria-label={collapsed ? label : undefined}
+              className={({ isActive }) => `navigation-link${isActive ? ' is-active' : ''}`}
+              end={end}
+              key={to}
+              title={collapsed ? label : undefined}
+              to={to}
+            >
+              <Icon aria-hidden="true" className="navigation-icon" size={18} />
+              <span className="navigation-text">{label}</span>
+            </NavLink>
+          ))}
         </nav>
 
         <div className="sidebar-bottom">
           <NavLink className="navigation-link" to="/health">
-            <span className="navigation-indicator" aria-hidden="true" />
-            Estado de la API
+            <span className="navigation-icon" aria-hidden="true">•</span>
+            <span className="navigation-text">Estado de la API</span>
           </NavLink>
-          <span className="sidebar-version">APTA DIGITAL · LOCAL</span>
+          <span className="sidebar-version">FOTO MINERVA · LOCAL</span>
         </div>
       </aside>
 
       <div className="workspace">
         <header className="topbar">
-          <div className="breadcrumb">
-            <span>Espacio de trabajo</span>
-            <span className="breadcrumb-divider" aria-hidden="true">/</span>
-            <strong>{currentPage}</strong>
+          <div className="topbar-brand">
+            <Brand compact />
+            <div className="breadcrumb">
+              <span>Estudio</span>
+              <span className="breadcrumb-divider" aria-hidden="true">/</span>
+              <strong>{currentPage}</strong>
+            </div>
           </div>
-          <details className="account-menu">
+          <details className="account-menu" id="account-menu">
             <summary>
               <span className="account-avatar">{initials}</span>
               <span className="account-copy">
@@ -166,8 +137,9 @@ function WorkspaceLayout() {
 
 export default function App() {
   const { status } = useAuth();
+  const location = useLocation();
 
-  if (status === 'loading') {
+  if (status === 'loading' && location.pathname !== '/' && location.pathname !== '/inicio') {
     return <div className="session-loading" role="status">Validando sesión...</div>;
   }
 
@@ -177,7 +149,7 @@ export default function App() {
     <Routes>
       <Route
         path="/"
-        element={<Navigate replace to={isAuthenticated ? '/dashboard' : '/login'} />}
+        element={<LandingPage />}
       />
       <Route path="/inicio" element={<LandingPage />} />
       <Route
@@ -189,20 +161,14 @@ export default function App() {
         element={isAuthenticated ? <Navigate replace to="/dashboard" /> : <RegisterScreen />}
       />
       <Route element={<ProtectedRoute><WorkspaceLayout /></ProtectedRoute>}>
-        <Route path="dashboard" element={<DashboardView />} />
-        <Route path="clientes" element={<CustomersView />} />
+        <Route path="dashboard" element={<StudioDashboard />} />
+        <Route path="pedidos" element={<StudioModule module="orders" />} />
+        <Route path="productos" element={<StudioModule module="products" />} />
+        <Route path="sesiones" element={<StudioModule module="sessions" />} />
+        <Route path="impresiones" element={<StudioModule module="prints" />} />
+        <Route path="clientes" element={<StudioModule module="customers" />} />
+        <Route path="asistencia" element={<StudioModule module="attendance" />} />
         <Route path="health" element={<Health />} />
-        {moduleRoutes.map((module) => (
-          <Route
-            element={(
-              <ProtectedRoute allowedRoles={module.roles}>
-                <ModulePlaceholder title={module.label} />
-              </ProtectedRoute>
-            )}
-            key={module.path}
-            path={module.path}
-          />
-        ))}
       </Route>
       <Route path="*" element={<Navigate replace to="/" />} />
     </Routes>
