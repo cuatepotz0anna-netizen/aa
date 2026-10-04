@@ -23,6 +23,112 @@ const today = () => {
 
 const formatCurrency = (value) => `$${Number(value || 0).toLocaleString('es-MX', { maximumFractionDigits: 2 })}`;
 
+const sanitizePdfText = (value) => String(value ?? '')
+  .replace(/\r?\n/g, ' ')
+  .replace(/[–—]/g, '-')
+  .replace(/[“”]/g, '"')
+  .replace(/[‘’]/g, "'")
+  .replace(/…/g, '...')
+  .replace(/[^\x20-\xFF]/g, '?');
+
+const escapePdfText = (value) => sanitizePdfText(value).replace(/([\\()])/g, '\\$1');
+
+const wrapPdfLine = (value, maxLength = 78) => {
+  const text = sanitizePdfText(value).trim();
+  if (!text) return [''];
+  const words = text.split(/\s+/);
+  const lines = [];
+  let line = '';
+  words.forEach((word) => {
+    if (!line) {
+      line = word;
+    } else if (`${line} ${word}`.length <= maxLength) {
+      line += ` ${word}`;
+    } else {
+      lines.push(line);
+      line = word;
+    }
+  });
+  if (line) lines.push(line);
+  return lines;
+};
+
+const createPdfBlob = (title, detailLines) => {
+  const bodyLines = detailLines.flatMap((line) => wrapPdfLine(line));
+  const pageSize = 42;
+  const pages = [];
+  for (let index = 0; index < bodyLines.length || index === 0; index += pageSize) {
+    pages.push(bodyLines.slice(index, index + pageSize));
+  }
+
+  const objects = [];
+  const pageRefs = pages.map((_, index) => `${4 + (index * 2)} 0 R`);
+  objects.push('<< /Type /Catalog /Pages 2 0 R >>');
+  objects.push(`<< /Type /Pages /Kids [${pageRefs.join(' ')}] /Count ${pages.length} >>`);
+  objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+
+  pages.forEach((lines, pageIndex) => {
+    const pageObjectNumber = 4 + (pageIndex * 2);
+    const contentObjectNumber = pageObjectNumber + 1;
+    const streamLines = [
+      'BT',
+      '/F1 16 Tf',
+      '50 800 Td',
+      '(FOTO MINERVA) Tj',
+      '0 -24 Td',
+      '/F1 12 Tf',
+      `(${escapePdfText(title)}) Tj`,
+      '0 -24 Td',
+      '/F1 10 Tf',
+      ...lines.flatMap((line) => [`(${escapePdfText(line || ' ')}) Tj`, '0 -15 Td']),
+      '0 -12 Td',
+      `/F1 8 Tf`,
+      `(Pagina ${pageIndex + 1} de ${pages.length}) Tj`,
+      'ET',
+    ];
+    const stream = streamLines.join('\n');
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`);
+    objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+  });
+
+  let pdf = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
+  const offsets = [];
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.forEach((offset) => {
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+  const bytes = Uint8Array.from(pdf, (character) => character.charCodeAt(0) & 0xff);
+  return new Blob([bytes], { type: 'application/pdf' });
+};
+
+const deliverPdf = async (fileName, blob) => {
+  const file = new File([blob], fileName, { type: 'application/pdf' });
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ title: 'Foto Minerva', files: [file] });
+      return;
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
 const readUserData = (userId) => {
   const stored = localStorage.getItem(`foto-minerva-data:${encodeURIComponent(userId)}`);
   if (!stored) return {};
@@ -415,6 +521,62 @@ export function StudioModule({ module }) {
 
   const updateRecord = (id, changes) => setRows((current) => current.map((row) => row.id === id ? { ...row, ...changes } : row));
 
+  const handleGeneratePdf = async (row) => {
+    try {
+      if (module === 'orders') {
+        const title = `Pedido ${row.number || 'sin numero'}`;
+        const lines = [
+          `Fecha: ${row.date || 'Sin fecha'}`,
+          `Cliente: ${row.customer || 'Sin cliente'}`,
+          `Estado: ${row.status || 'Sin estado'}`,
+          '',
+          `Articulos y servicios: ${row.items || 'Sin detalle'}`,
+          `Cantidad de productos: ${row.productCount || 0}`,
+          `Total: ${formatCurrency(row.total)}`,
+          `Impresion asociada: ${row.prints || 'Ninguna'}`,
+          `Sesion asociada: ${row.session || 'Ninguna'}`,
+          '',
+          `Documento generado: ${new Date().toLocaleString('es-MX')}`,
+        ];
+        const safeNumber = sanitizePdfText(row.number || row.id || 'pedido').replace(/[^a-zA-Z0-9_-]+/g, '-');
+        await deliverPdf(`Foto-Minerva-Pedido-${safeNumber}.pdf`, createPdfBlob(title, lines));
+        setNotice('PDF del pedido generado correctamente.');
+        return;
+      }
+
+      if (module === 'customers') {
+        const relatedOrders = allOrders.filter((item) => item.customer === row.name);
+        const relatedSessions = allSessions.filter((item) => item.customer === row.name);
+        const relatedPrints = allPrints.filter((item) => item.customer === row.name);
+        const history = [
+          ...relatedOrders.map((item) => `Pedido ${item.number || 'sin numero'} - ${item.status || 'Sin estado'} - ${formatCurrency(item.total)}`),
+          ...relatedSessions.map((item) => `Sesion ${item.type || ''} - ${item.date || ''} ${item.time || ''} - ${item.status || ''}`),
+          ...relatedPrints.map((item) => `Impresion ${item.format || ''} ${item.size || ''} - ${item.status || ''}`),
+        ];
+        const lines = [
+          `Cliente: ${row.name}`,
+          `Telefono: ${row.phone || 'Sin telefono registrado'}`,
+          `Correo: ${row.email || 'Sin correo registrado'}`,
+          `Observaciones: ${row.notes || 'Sin observaciones'}`,
+          '',
+          `Pedidos: ${relatedOrders.length}`,
+          `Sesiones: ${relatedSessions.length}`,
+          `Impresiones: ${relatedPrints.length}`,
+          '',
+          'Historial:',
+          ...(history.length ? history : ['Aun no hay operaciones asociadas.']),
+          '',
+          `Documento generado: ${new Date().toLocaleString('es-MX')}`,
+        ];
+        const safeName = sanitizePdfText(row.name || row.id || 'cliente').replace(/[^a-zA-Z0-9_-]+/g, '-');
+        await deliverPdf(`Foto-Minerva-Cliente-${safeName}.pdf`, createPdfBlob(`Ficha de cliente - ${row.name}`, lines));
+        setNotice('PDF del cliente generado correctamente.');
+      }
+    } catch {
+      setNotice('No se pudo generar el PDF. Intenta nuevamente.');
+    }
+  };
+
   const moduleValue = module === 'orders'
     ? rows.reduce((total, row) => total + Number(row.total || 0), 0)
     : module === 'products'
@@ -569,6 +731,7 @@ export function StudioModule({ module }) {
                 {row.notes && <p className="studio-customer-notes">{row.notes}</p>}
                 <div className="studio-customer-actions">
                   <button className="studio-text-button" onClick={() => handleToggleDetail(row.id)} type="button">{detailId === row.id ? 'Cerrar historial' : 'Ver historial'}</button>
+                  <button className="studio-text-button" onClick={() => handleGeneratePdf(row)} type="button">Generar PDF</button>
                   <button className="studio-text-button" onClick={() => handleOpenEdit(row)} type="button">Editar cliente</button>
                 </div>
                 {detailId === row.id && recordDetail(row)}
@@ -590,6 +753,7 @@ export function StudioModule({ module }) {
                       {module === 'attendance' && row.status !== 'Ausencia' && (row.checkIn ? (
                         <button className="studio-text-button" onClick={() => { updateRecord(row.id, { checkOut: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }), status: 'Jornada completada' }); setNotice('Salida registrada correctamente.'); }} type="button">Registrar salida</button>
                       ) : <button className="studio-text-button" onClick={() => { updateRecord(row.id, { checkIn: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }), status: 'Pendiente de salida' }); setNotice('Entrada registrada correctamente.'); }} type="button">Registrar entrada</button>)}
+                      {module === 'orders' && <button className="studio-text-button" onClick={() => handleGeneratePdf(row)} type="button">Generar PDF</button>}
                       <button className="studio-text-button" onClick={() => handleToggleDetail(row.id)} type="button">{detailId === row.id ? 'Cerrar detalle' : 'Ver detalle'}</button>
                       <button className="studio-text-button" onClick={() => handleOpenEdit(row)} type="button">Editar</button>
                     </td>
