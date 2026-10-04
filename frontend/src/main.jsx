@@ -24,8 +24,16 @@ const isPdfShare = (data = {}) => Array.isArray(data.files)
 
 const defineNavigatorMethod = (name, value) => {
   try {
+    navigator[name] = value;
+    if (navigator[name] === value) return true;
+  } catch {
+    // Continúa con defineProperty.
+  }
+
+  try {
     Object.defineProperty(navigator, name, {
       configurable: true,
+      writable: true,
       value,
     });
     return true;
@@ -33,6 +41,7 @@ const defineNavigatorMethod = (name, value) => {
     try {
       Object.defineProperty(Navigator.prototype, name, {
         configurable: true,
+        writable: true,
         value,
       });
       return true;
@@ -40,6 +49,18 @@ const defineNavigatorMethod = (name, value) => {
       return false;
     }
   }
+};
+
+const downloadPdfInBrowser = (file) => {
+  const url = URL.createObjectURL(file);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = file.name || `Foto-Minerva-${Date.now()}.pdf`;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 };
 
 const configurePdfDelivery = () => {
@@ -88,10 +109,23 @@ const configurePdfDelivery = () => {
     return;
   }
 
-  // En navegador de escritorio desactivamos Web Share para que
-  // la función de PDF use siempre la descarga directa del navegador.
-  defineNavigatorMethod('canShare', undefined);
-  defineNavigatorMethod('share', undefined);
+  // En web de escritorio, cualquier PDF que intente usar Web Share
+  // se convierte directamente en una descarga del navegador.
+  const browserCanShare = (data = {}) => isPdfShare(data);
+  const browserShare = async (data = {}) => {
+    const pdfFile = Array.isArray(data.files)
+      ? data.files.find((file) => file?.type === 'application/pdf')
+      : null;
+
+    if (!pdfFile) {
+      throw new Error('Compartir desde navegador no está habilitado para este contenido.');
+    }
+
+    downloadPdfInBrowser(pdfFile);
+  };
+
+  defineNavigatorMethod('canShare', browserCanShare);
+  defineNavigatorMethod('share', browserShare);
 };
 
 configurePdfDelivery();
