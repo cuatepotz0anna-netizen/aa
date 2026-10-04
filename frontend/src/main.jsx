@@ -63,6 +63,13 @@ const downloadPdfInBrowser = (file) => {
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 };
 
+const isMobileWeb = () => {
+  const userAgent = navigator.userAgent || '';
+  const mobileAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
+  const touchDevice = navigator.maxTouchPoints > 1;
+  return mobileAgent || (touchDevice && window.innerWidth <= 1024);
+};
+
 const configurePdfDelivery = () => {
   if (typeof navigator === 'undefined') return;
 
@@ -92,10 +99,6 @@ const configurePdfDelivery = () => {
         recursive: true,
       });
 
-      window.alert(
-        'PDF generado correctamente. Ahora elige una opción para Guardar o Compartir el documento.'
-      );
-
       await Share.share({
         title: data.title || 'Foto Minerva',
         text: 'PDF generado por Foto Minerva.',
@@ -109,7 +112,11 @@ const configurePdfDelivery = () => {
     return;
   }
 
-  // En web de escritorio, cualquier PDF que intente usar Web Share
+  // En web móvil conservamos Web Share para abrir directamente
+  // las opciones del sistema para guardar o compartir el PDF.
+  if (isMobileWeb()) return;
+
+  // En escritorio, cualquier PDF que intente usar Web Share
   // se convierte directamente en una descarga del navegador.
   const browserCanShare = (data = {}) => isPdfShare(data);
   const browserShare = async (data = {}) => {
