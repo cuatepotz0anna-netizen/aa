@@ -28,22 +28,25 @@ const sanitizePdfText = (value) => String(value ?? '')
   .replace(/[–—]/g, '-')
   .replace(/[“”]/g, '"')
   .replace(/[‘’]/g, "'")
-  .replace(/…/g, '...')
-  .replace(/[^\x20-\xFF]/g, '?');
+  .replace(/…/g, '...');
 
-const escapePdfText = (value) => sanitizePdfText(value).replace(/([\\()])/g, '\\$1');
+const loadPdfLogo = () => new Promise((resolve) => {
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => resolve(null);
+  image.src = '/assets/foto-minerva-mark.png';
+});
 
-const wrapPdfLine = (value, maxLength = 78) => {
+const wrapCanvasText = (context, value, maxWidth) => {
   const text = sanitizePdfText(value).trim();
   if (!text) return [''];
   const words = text.split(/\s+/);
   const lines = [];
   let line = '';
   words.forEach((word) => {
-    if (!line) {
-      line = word;
-    } else if (`${line} ${word}`.length <= maxLength) {
-      line += ` ${word}`;
+    const nextLine = line ? `${line} ${word}` : word;
+    if (!line || context.measureText(nextLine).width <= maxWidth) {
+      line = nextLine;
     } else {
       lines.push(line);
       line = word;
@@ -53,42 +56,132 @@ const wrapPdfLine = (value, maxLength = 78) => {
   return lines;
 };
 
-const createPdfBlob = (title, detailLines) => {
-  const bodyLines = detailLines.flatMap((line) => wrapPdfLine(line));
-  const pageSize = 42;
+const dataUrlToBinary = (dataUrl) => {
+  const base64 = dataUrl.split(',')[1];
+  const binary = atob(base64);
+  return binary;
+};
+
+const createPdfBlob = async (title, detailLines) => {
+  const width = 1240;
+  const height = 1754;
+  const bodyCanvas = document.createElement('canvas');
+  bodyCanvas.width = width;
+  bodyCanvas.height = height;
+  const measureContext = bodyCanvas.getContext('2d');
+  measureContext.font = "22px 'Aptos', 'Segoe UI', sans-serif";
+
+  const wrappedLines = detailLines.flatMap((line) => wrapCanvasText(measureContext, line, 1030));
+  const linesPerPage = 34;
   const pages = [];
-  for (let index = 0; index < bodyLines.length || index === 0; index += pageSize) {
-    pages.push(bodyLines.slice(index, index + pageSize));
+  for (let index = 0; index < wrappedLines.length || index === 0; index += linesPerPage) {
+    pages.push(wrappedLines.slice(index, index + linesPerPage));
   }
 
-  const objects = [];
-  const pageRefs = pages.map((_, index) => `${4 + (index * 2)} 0 R`);
-  objects.push('<< /Type /Catalog /Pages 2 0 R >>');
-  objects.push(`<< /Type /Pages /Kids [${pageRefs.join(' ')}] /Count ${pages.length} >>`);
-  objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+  const logo = await loadPdfLogo();
+  const pageImages = pages.map((lines, pageIndex) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
 
-  pages.forEach((lines, pageIndex) => {
-    const pageObjectNumber = 4 + (pageIndex * 2);
+    context.fillStyle = '#fff2f7';
+    context.fillRect(0, 0, width, height);
+
+    context.fillStyle = '#fff9fc';
+    context.fillRect(48, 48, width - 96, height - 96);
+
+    context.strokeStyle = '#edbdd2';
+    context.lineWidth = 3;
+    context.strokeRect(48, 48, width - 96, height - 96);
+
+    if (logo) {
+      context.drawImage(logo, 82, 74, 112, 112);
+    }
+
+    context.fillStyle = '#482638';
+    context.font = "700 34px 'Aptos', 'Segoe UI', sans-serif";
+    context.fillText('Foto Minerva', 218, 118);
+
+    context.fillStyle = '#a23f6b';
+    context.font = "600 18px 'Aptos', 'Segoe UI', sans-serif";
+    context.fillText('ESTUDIO FOTOGRÁFICO', 218, 153);
+
+    context.strokeStyle = '#f0dce6';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(82, 210);
+    context.lineTo(width - 82, 210);
+    context.stroke();
+
+    context.fillStyle = '#482638';
+    context.font = "700 30px 'Aptos', 'Segoe UI', sans-serif";
+    context.fillText(sanitizePdfText(title), 82, 270);
+
+    context.fillStyle = '#ffffff';
+    context.fillRect(82, 310, width - 164, 1240);
+    context.strokeStyle = '#f0dce6';
+    context.strokeRect(82, 310, width - 164, 1240);
+
+    let y = 365;
+    lines.forEach((line) => {
+      const safeLine = sanitizePdfText(line);
+      if (!safeLine) {
+        y += 24;
+        return;
+      }
+      const colonIndex = safeLine.indexOf(':');
+      if (colonIndex > 0 && colonIndex < 34) {
+        const label = safeLine.slice(0, colonIndex + 1);
+        const value = safeLine.slice(colonIndex + 1).trim();
+        context.fillStyle = '#81425e';
+        context.font = "700 21px 'Aptos', 'Segoe UI', sans-serif";
+        context.fillText(label, 118, y);
+        const labelWidth = context.measureText(label).width;
+        context.fillStyle = '#634b59';
+        context.font = "400 21px 'Aptos', 'Segoe UI', sans-serif";
+        context.fillText(value, 128 + labelWidth, y);
+      } else {
+        context.fillStyle = safeLine === 'Historial:' ? '#81425e' : '#634b59';
+        context.font = safeLine === 'Historial:'
+          ? "700 23px 'Aptos', 'Segoe UI', sans-serif"
+          : "400 21px 'Aptos', 'Segoe UI', sans-serif";
+        context.fillText(safeLine, 118, y);
+      }
+      y += 34;
+    });
+
+    context.strokeStyle = '#f0dce6';
+    context.beginPath();
+    context.moveTo(82, 1600);
+    context.lineTo(width - 82, 1600);
+    context.stroke();
+
+    context.fillStyle = '#826c79';
+    context.font = "400 17px 'Aptos', 'Segoe UI', sans-serif";
+    context.textAlign = 'left';
+    context.fillText('Documento generado por Foto Minerva', 82, 1645);
+    context.textAlign = 'center';
+    context.fillText(`Página ${pageIndex + 1} de ${pages.length}`, width / 2, 1645);
+    context.textAlign = 'right';
+    context.fillText(new Date().toLocaleDateString('es-MX'), width - 82, 1645);
+
+    return dataUrlToBinary(canvas.toDataURL('image/jpeg', 0.94));
+  });
+
+  const objects = [];
+  const pageRefs = pageImages.map((_, index) => `${3 + (index * 3)} 0 R`);
+  objects.push('<< /Type /Catalog /Pages 2 0 R >>');
+  objects.push(`<< /Type /Pages /Kids [${pageRefs.join(' ')}] /Count ${pageImages.length} >>`);
+
+  pageImages.forEach((imageBinary, pageIndex) => {
+    const pageObjectNumber = 3 + (pageIndex * 3);
     const contentObjectNumber = pageObjectNumber + 1;
-    const streamLines = [
-      'BT',
-      '/F1 16 Tf',
-      '50 800 Td',
-      '(FOTO MINERVA) Tj',
-      '0 -24 Td',
-      '/F1 12 Tf',
-      `(${escapePdfText(title)}) Tj`,
-      '0 -24 Td',
-      '/F1 10 Tf',
-      ...lines.flatMap((line) => [`(${escapePdfText(line || ' ')}) Tj`, '0 -15 Td']),
-      '0 -12 Td',
-      `/F1 8 Tf`,
-      `(Pagina ${pageIndex + 1} de ${pages.length}) Tj`,
-      'ET',
-    ];
-    const stream = streamLines.join('\n');
-    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`);
+    const imageObjectNumber = pageObjectNumber + 2;
+    const stream = 'q\n595 0 0 842 0 0 cm\n/Im1 Do\nQ';
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im1 ${imageObjectNumber} 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`);
     objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+    objects.push(`<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBinary.length} >>\nstream\n${imageBinary}\nendstream`);
   });
 
   let pdf = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
@@ -524,22 +617,23 @@ export function StudioModule({ module }) {
   const handleGeneratePdf = async (row) => {
     try {
       if (module === 'orders') {
-        const title = `Pedido ${row.number || 'sin numero'}`;
+        const title = `Pedido ${row.number || 'sin número'}`;
         const lines = [
           `Fecha: ${row.date || 'Sin fecha'}`,
           `Cliente: ${row.customer || 'Sin cliente'}`,
           `Estado: ${row.status || 'Sin estado'}`,
           '',
-          `Articulos y servicios: ${row.items || 'Sin detalle'}`,
+          `Artículos y servicios: ${row.items || 'Sin detalle'}`,
           `Cantidad de productos: ${row.productCount || 0}`,
           `Total: ${formatCurrency(row.total)}`,
-          `Impresion asociada: ${row.prints || 'Ninguna'}`,
-          `Sesion asociada: ${row.session || 'Ninguna'}`,
+          `Impresión asociada: ${row.prints || 'Ninguna'}`,
+          `Sesión asociada: ${row.session || 'Ninguna'}`,
           '',
           `Documento generado: ${new Date().toLocaleString('es-MX')}`,
         ];
         const safeNumber = sanitizePdfText(row.number || row.id || 'pedido').replace(/[^a-zA-Z0-9_-]+/g, '-');
-        await deliverPdf(`Foto-Minerva-Pedido-${safeNumber}.pdf`, createPdfBlob(title, lines));
+        const blob = await createPdfBlob(title, lines);
+        await deliverPdf(`Foto-Minerva-Pedido-${safeNumber}.pdf`, blob);
         setNotice('PDF del pedido generado correctamente.');
         return;
       }
@@ -549,13 +643,13 @@ export function StudioModule({ module }) {
         const relatedSessions = allSessions.filter((item) => item.customer === row.name);
         const relatedPrints = allPrints.filter((item) => item.customer === row.name);
         const history = [
-          ...relatedOrders.map((item) => `Pedido ${item.number || 'sin numero'} - ${item.status || 'Sin estado'} - ${formatCurrency(item.total)}`),
-          ...relatedSessions.map((item) => `Sesion ${item.type || ''} - ${item.date || ''} ${item.time || ''} - ${item.status || ''}`),
-          ...relatedPrints.map((item) => `Impresion ${item.format || ''} ${item.size || ''} - ${item.status || ''}`),
+          ...relatedOrders.map((item) => `Pedido ${item.number || 'sin número'} - ${item.status || 'Sin estado'} - ${formatCurrency(item.total)}`),
+          ...relatedSessions.map((item) => `Sesión ${item.type || ''} - ${item.date || ''} ${item.time || ''} - ${item.status || ''}`),
+          ...relatedPrints.map((item) => `Impresión ${item.format || ''} ${item.size || ''} - ${item.status || ''}`),
         ];
         const lines = [
           `Cliente: ${row.name}`,
-          `Telefono: ${row.phone || 'Sin telefono registrado'}`,
+          `Teléfono: ${row.phone || 'Sin teléfono registrado'}`,
           `Correo: ${row.email || 'Sin correo registrado'}`,
           `Observaciones: ${row.notes || 'Sin observaciones'}`,
           '',
@@ -564,12 +658,13 @@ export function StudioModule({ module }) {
           `Impresiones: ${relatedPrints.length}`,
           '',
           'Historial:',
-          ...(history.length ? history : ['Aun no hay operaciones asociadas.']),
+          ...(history.length ? history : ['Aún no hay operaciones asociadas.']),
           '',
           `Documento generado: ${new Date().toLocaleString('es-MX')}`,
         ];
         const safeName = sanitizePdfText(row.name || row.id || 'cliente').replace(/[^a-zA-Z0-9_-]+/g, '-');
-        await deliverPdf(`Foto-Minerva-Cliente-${safeName}.pdf`, createPdfBlob(`Ficha de cliente - ${row.name}`, lines));
+        const blob = await createPdfBlob(`Ficha de cliente - ${row.name}`, lines);
+        await deliverPdf(`Foto-Minerva-Cliente-${safeName}.pdf`, blob);
         setNotice('PDF del cliente generado correctamente.');
       }
     } catch {
