@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { App as CapacitorApp } from '@capacitor/app';
 import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Images, LayoutDashboard, Menu, Package, Users, UserCheck, X } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -153,6 +154,31 @@ function WorkspaceLayout() {
 export default function App() {
   const { status, user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let listener;
+    CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      const path = location.pathname;
+      const isRoot = path === '/' || path === '/inicio' || path === '/dashboard' || path === '/login' || path === '/register';
+
+      if (canGoBack || (!isRoot && window.history.length > 1)) {
+        navigate(-1);
+      } else if (isRoot) {
+        CapacitorApp.exitApp();
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    }).then((l) => {
+      listener = l;
+    });
+
+    return () => {
+      if (listener) {
+        listener.remove();
+      }
+    };
+  }, [location, navigate]);
 
   if (status === 'loading' && location.pathname !== '/' && location.pathname !== '/inicio') {
     return <div className="session-loading" role="status">Validando sesión...</div>;

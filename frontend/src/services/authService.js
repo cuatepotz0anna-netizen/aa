@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV
+  ? 'http://localhost:5000/api'
+  : 'https://apta-backend-e3t7.onrender.com/api');
 const API_CONNECTION_ERROR = 'No se pudo conectar con la API. Verifica que el backend esté iniciado y que su configuración de MongoDB sea válida.';
 
 const requestJson = async (path, options, fallbackMessage) => {

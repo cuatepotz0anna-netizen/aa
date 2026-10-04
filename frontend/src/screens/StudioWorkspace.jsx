@@ -286,6 +286,45 @@ export function StudioModule({ module }) {
   const [detailId, setDetailId] = useState(null);
   const [notice, setNotice] = useState('');
 
+  useEffect(() => {
+    const handlePopState = () => {
+      if (editing) {
+        setEditing(null);
+      } else if (detailId) {
+        setDetailId(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [editing, detailId]);
+
+  const handleOpenEdit = (record) => {
+    window.history.pushState({ modal: true }, '');
+    setEditing(record);
+    setNotice('');
+  };
+
+  const handleCancelEdit = () => {
+    if (editing) {
+      window.history.back();
+    } else {
+      setEditing(null);
+    }
+  };
+
+  const handleToggleDetail = (id) => {
+    if (detailId === id) {
+      window.history.back();
+    } else {
+      window.history.pushState({ detail: true }, '');
+      setDetailId(id);
+    }
+  };
+
+  const handleCloseDetail = () => {
+    window.history.back();
+  };
+
   const filtered = rows.filter((row) => {
     const matchesQuery = Object.values(row).some((value) => String(value).toLowerCase().includes(query.toLowerCase()));
     return matchesQuery && (!statusFilter || row.status === statusFilter || row.availability === statusFilter);
@@ -309,7 +348,32 @@ export function StudioModule({ module }) {
 
   const recordDetail = (row) => {
     if (module === 'orders') {
-      return <div className="studio-related"><strong>Detalle del pedido {row.number}</strong><span>Fecha: {row.date} · Cliente: {row.customer}</span><span>Artículos y servicios: {row.items}</span><span>Productos: {row.productCount} · Total: ${Number(row.total || 0).toLocaleString('es-MX')}</span><span>Impresión asociada: {row.prints || 'Ninguna'} · Sesión: {row.session || 'Ninguna'}</span></div>;
+      return (
+        <div className="studio-related">
+          <strong>Detalle del pedido {row.number}</strong>
+          <span>Fecha: {row.date} · Cliente: {row.customer}</span>
+          <span>Artículos y servicios: {row.items}</span>
+          <span>Productos: {row.productCount} · Total: ${Number(row.total || 0).toLocaleString('es-MX')}</span>
+          <span>Impresión asociada: {row.prints || 'Ninguna'} · Sesión: {row.session || 'Ninguna'}</span>
+          <div style={{ marginTop: '8px' }}>
+            <button className="studio-text-button" onClick={handleCloseDetail} type="button">Salir</button>
+          </div>
+        </div>
+      );
+    }
+    if (module === 'products') {
+      return (
+        <div className="studio-related">
+          <strong>Detalle del producto {row.name}</strong>
+          <span>Categoría: {row.category}</span>
+          <span>Descripción: {row.description || 'Sin descripción'}</span>
+          <span>Precio: ${Number(row.price || 0).toLocaleString('es-MX')} · Existencia: {row.stock}</span>
+          <span>Disponibilidad: {row.availability}</span>
+          <div style={{ marginTop: '8px' }}>
+            <button className="studio-text-button" onClick={handleCloseDetail} type="button">Salir</button>
+          </div>
+        </div>
+      );
     }
     if (module !== 'customers') return null;
     const relatedOrders = allOrders.filter((item) => item.customer === row.name);
@@ -321,6 +385,9 @@ export function StudioModule({ module }) {
         <span>Pedidos: {relatedOrders.length} · Sesiones: {relatedSessions.length} · Impresiones: {relatedPrints.length}</span>
         {[...relatedOrders.map((item) => `Pedido ${item.number}: ${item.status}`), ...relatedSessions.map((item) => `${item.type}: ${item.date} ${item.time}`), ...relatedPrints.map((item) => `${item.format}: ${item.status}`)].map((item) => <span key={item}>{item}</span>)}
         {!relatedOrders.length && !relatedSessions.length && !relatedPrints.length && <span>Aún no hay operaciones asociadas.</span>}
+        <div style={{ marginTop: '8px' }}>
+          <button className="studio-text-button" onClick={handleCloseDetail} type="button">Salir</button>
+        </div>
       </div>
     );
   };
@@ -329,7 +396,7 @@ export function StudioModule({ module }) {
     <div className="studio-page">
       <div className="studio-page-heading">
         <div><p className="studio-eyebrow">FOTO MINERVA · OPERACIÓN</p><h1>{config.title}</h1><p className="studio-description">{config.description}</p></div>
-        <button className="studio-button studio-button-primary" onClick={() => { setEditing({}); setNotice(''); }} type="button"><Plus size={16} /> {config.addLabel}</button>
+        <button className="studio-button studio-button-primary" onClick={() => handleOpenEdit({})} type="button"><Plus size={16} /> {config.addLabel}</button>
       </div>
       {notice && <p className="studio-notice" role="status">{notice}</p>}
       <section className="studio-panel studio-list-panel">
@@ -344,7 +411,7 @@ export function StudioModule({ module }) {
             {!rows.length && <p className="studio-empty">{emptyMessages.sessions}</p>}
           </div>
         </section>}
-        {editing && <div className="studio-form-panel"><h2>{editing.id ? `Editar ${entityLabels[module].toLowerCase()}` : config.addLabel}</h2><RecordForm config={config} initial={editing.id ? editing : undefined} onCancel={() => setEditing(null)} onSave={save} /></div>}
+        {editing && <div className="studio-form-panel"><h2>{editing.id ? `Editar ${entityLabels[module].toLowerCase()}` : config.addLabel}</h2><RecordForm config={config} initial={editing.id ? editing : undefined} onCancel={handleCancelEdit} onSave={save} /></div>}
         {module === 'customers' ? (
           <div className="studio-customer-grid">
             {filtered.map((row) => (
@@ -359,8 +426,8 @@ export function StudioModule({ module }) {
                 </dl>
                 {row.notes && <p className="studio-customer-notes">{row.notes}</p>}
                 <div className="studio-customer-actions">
-                  <button className="studio-text-button" onClick={() => setDetailId(detailId === row.id ? null : row.id)} type="button">{detailId === row.id ? 'Ocultar historial' : 'Ver historial'}</button>
-                  <button className="studio-text-button" onClick={() => { setEditing(row); setNotice(''); }} type="button">Editar cliente</button>
+                  <button className="studio-text-button" onClick={() => handleToggleDetail(row.id)} type="button">{detailId === row.id ? 'Salir' : 'Ver historial'}</button>
+                  <button className="studio-text-button" onClick={() => handleOpenEdit(row)} type="button">Editar cliente</button>
                 </div>
                 {detailId === row.id && recordDetail(row)}
               </article>
@@ -381,8 +448,9 @@ export function StudioModule({ module }) {
                       {module === 'attendance' && row.status !== 'Ausencia' && (row.checkIn ? (
                         <button className="studio-text-button" onClick={() => { updateRecord(row.id, { checkOut: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }), status: 'Jornada completada' }); setNotice('Salida registrada.'); }} type="button">Registrar salida</button>
                       ) : <button className="studio-text-button" onClick={() => { updateRecord(row.id, { checkIn: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }), status: 'Pendiente de salida' }); setNotice('Entrada registrada.'); }} type="button">Registrar entrada</button>)}
-                      {module === 'orders' && <button className="studio-text-button" onClick={() => setDetailId(detailId === row.id ? null : row.id)} type="button">{detailId === row.id ? 'Ocultar detalle' : 'Ver detalle'}</button>}
-                      <button className="studio-text-button" onClick={() => { setEditing(row); setNotice(''); }} type="button">Editar</button>
+                      {module === 'orders' && <button className="studio-text-button" onClick={() => handleToggleDetail(row.id)} type="button">{detailId === row.id ? 'Salir' : 'Ver detalle'}</button>}
+                      {module === 'products' && <button className="studio-text-button" onClick={() => handleToggleDetail(row.id)} type="button">{detailId === row.id ? 'Salir' : 'Ver detalle'}</button>}
+                      <button className="studio-text-button" onClick={() => handleOpenEdit(row)} type="button">Editar</button>
                     </td>
                   </tr>
                   {detailId === row.id && <tr className="studio-detail-row" key={`${row.id}-detail`}><td colSpan={config.columns.length + 1}>{recordDetail(row)}</td></tr>}
