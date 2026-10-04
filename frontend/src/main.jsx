@@ -88,16 +88,10 @@ const configurePdfDelivery = () => {
     return;
   }
 
-  const browserCanShare = typeof navigator.canShare === 'function'
-    ? navigator.canShare.bind(navigator)
-    : null;
-
-  if (browserCanShare) {
-    defineNavigatorMethod('canShare', (data = {}) => {
-      if (isPdfShare(data)) return false;
-      return browserCanShare(data);
-    });
-  }
+  // En navegador de escritorio desactivamos Web Share para que
+  // la función de PDF use siempre la descarga directa del navegador.
+  defineNavigatorMethod('canShare', undefined);
+  defineNavigatorMethod('share', undefined);
 };
 
 configurePdfDelivery();
