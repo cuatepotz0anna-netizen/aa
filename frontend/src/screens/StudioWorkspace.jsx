@@ -1,6 +1,7 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import './StudioWorkspace.css';
 
 const today = () => {
@@ -8,56 +9,64 @@ const today = () => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
-const sampleData = {
-  orders: [
-    { id: 'order-101', number: 'FM-0101', date: today(), customer: 'Cliente demostración 01', items: 'Álbum familiar, 20 fotografías', productCount: 21, total: 1850, status: 'En impresión', prints: 'Formato infantil', session: 'Sesión familiar' },
-    { id: 'order-102', number: 'FM-0102', date: today(), customer: 'Cliente demostración 02', items: 'Marco premium', productCount: 1, total: 980, status: 'Listo para entrega', prints: '', session: '' },
-    { id: 'order-103', number: 'FM-0103', date: today(), customer: 'Cliente demostración 03', items: 'Retratos mignon', productCount: 12, total: 420, status: 'En revisión', prints: 'Mignon', session: '' },
-  ],
-  products: [
-    { id: 'product-1', name: 'Álbum familiar', category: 'Álbumes', description: 'Álbum fotográfico de cubierta rígida.', price: 1250, stock: 8, availability: 'Disponible' },
-    { id: 'product-2', name: 'Marco premium', category: 'Marcos', description: 'Marco para fotografía de formato mediano.', price: 980, stock: 5, availability: 'Disponible' },
-    { id: 'product-3', name: 'Impresión mignon', category: 'Impresiones', description: 'Impresión fotográfica en formato mignon.', price: 35, stock: 100, availability: 'Disponible' },
-    { id: 'product-4', name: 'Paquete de retratos infantiles', category: 'Artículos fotográficos', description: 'Paquete de retratos para fotografía infantil.', price: 520, stock: 12, availability: 'Disponible' },
-  ],
-  sessions: [
-    { id: 'session-1', customer: 'Cliente demostración 01', date: today(), time: '10:30', type: 'Sesión familiar', responsible: 'Fotógrafo demo 01', location: 'Estudio principal', status: 'Confirmada', notes: 'Preparar fondo claro.' },
-    { id: 'session-2', customer: 'Cliente demostración 04', date: today(), time: '13:00', type: 'Fotografía infantil', responsible: 'Fotógrafo demo 02', location: 'Estudio principal', status: 'En preparación', notes: '' },
-  ],
-  prints: [
-    { id: 'print-1', customer: 'Cliente demostración 01', order: 'FM-0101', format: 'Infantil', size: '13 × 18 cm', quantity: 20, finish: 'Brillante', date: today(), status: 'En producción' },
-    { id: 'print-2', customer: 'Cliente demostración 03', order: 'FM-0103', format: 'Mignon', size: '3.5 × 4.5 cm', quantity: 12, finish: 'Mate', date: today(), status: 'Revisión' },
-  ],
-  customers: [
-    { id: 'customer-1', name: 'Cliente demostración 01', phone: '555-0101', email: 'cliente01@ejemplo.test', notes: 'Prefiere recibir aviso por correo.' },
-    { id: 'customer-2', name: 'Cliente demostración 02', phone: '555-0102', email: 'cliente02@ejemplo.test', notes: '' },
-    { id: 'customer-3', name: 'Cliente demostración 03', phone: '555-0103', email: 'cliente03@ejemplo.test', notes: '' },
-    { id: 'customer-4', name: 'Cliente demostración 04', phone: '555-0104', email: 'cliente04@ejemplo.test', notes: 'Sesión infantil.' },
-  ],
-  attendance: [
-    { id: 'attendance-1', employee: 'Personal demo 01', date: today(), checkIn: '09:00', checkOut: '', status: 'Pendiente de salida' },
-    { id: 'attendance-2', employee: 'Personal demo 02', date: today(), checkIn: '09:10', checkOut: '17:05', status: 'Jornada completada' },
-    { id: 'attendance-3', employee: 'Personal demo 03', date: today(), checkIn: '', checkOut: '', status: 'Ausencia' },
-  ],
+const readUserData = (userId) => {
+  const stored = localStorage.getItem(`foto-minerva-data:${encodeURIComponent(userId)}`);
+  if (!stored) return {};
+
+  const data = JSON.parse(stored);
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('Los datos locales del usuario tienen un formato inválido.');
+  }
+  return data;
 };
 
-const collectionKeys = {
-  orders: 'foto-minerva-orders',
-  products: 'foto-minerva-products',
-  sessions: 'foto-minerva-sessions',
-  prints: 'foto-minerva-prints',
-  customers: 'foto-minerva-customers',
-  attendance: 'foto-minerva-attendance',
+const readCollection = (userId, name) => {
+  const data = readUserData(userId);
+  const rows = data[name] ?? [];
+  if (!Array.isArray(rows)) {
+    throw new Error(`La colección local "${name}" del usuario tiene un formato inválido.`);
+  }
+  return rows;
 };
 
 function useCollection(name) {
-  const key = collectionKeys[name];
-  const [rows, setRows] = useState(() => JSON.parse(localStorage.getItem(key) || 'null') || sampleData[name]);
-  const updateRows = (next) => setRows((current) => {
-    const value = typeof next === 'function' ? next(current) : next;
-    localStorage.setItem(key, JSON.stringify(value));
+  const { user } = useAuth();
+  const userId = user?.id || user?._id;
+  if (typeof userId !== 'string' && typeof userId !== 'number') {
+    throw new Error('El usuario autenticado no tiene un identificador estable para sus datos.');
+  }
+  const stableUserId = String(userId);
+  const [collectionState, setCollectionState] = useState(() => ({
+    userId: stableUserId,
+    rows: readCollection(stableUserId, name),
+  }));
+
+  useEffect(() => {
+    setCollectionState({ userId: stableUserId, rows: readCollection(stableUserId, name) });
+  }, [name, stableUserId]);
+
+  const rows = collectionState.userId === stableUserId ? collectionState.rows : [];
+  const updateRows = useCallback((next) => {
+    const data = readUserData(stableUserId);
+    const currentRows = data[name] ?? [];
+    if (!Array.isArray(currentRows)) {
+      throw new Error(`La colección local "${name}" del usuario tiene un formato inválido.`);
+    }
+    const value = typeof next === 'function' ? next(currentRows) : next;
+    if (!Array.isArray(value)) {
+      throw new Error(`La colección local "${name}" debe permanecer como una lista.`);
+    }
+
+    localStorage.setItem(
+      `foto-minerva-data:${encodeURIComponent(stableUserId)}`,
+      JSON.stringify({ ...data, [name]: value })
+    );
+    setCollectionState((current) => current.userId === stableUserId
+      ? { userId: stableUserId, rows: value }
+      : current);
     return value;
-  });
+  }, [name, stableUserId]);
+
   return [rows, updateRows];
 }
 
@@ -155,6 +164,15 @@ const entityLabels = {
   attendance: 'Registro de asistencia',
 };
 
+const emptyMessages = {
+  orders: 'Aún no hay pedidos registrados.',
+  products: 'Aún no hay productos registrados.',
+  sessions: 'No hay sesiones programadas.',
+  prints: 'Aún no hay impresiones registradas.',
+  customers: 'Aún no hay clientes.',
+  attendance: 'No hay registros de asistencia.',
+};
+
 function StatusBadge({ children }) {
   return <span className="studio-badge">{children || '—'}</span>;
 }
@@ -222,33 +240,33 @@ export function StudioDashboard() {
           <div className="studio-section-heading"><div><h2>Seguimiento de pedidos</h2><p>Estado actual de los pedidos abiertos</p></div><Link to="/pedidos">Ver todos</Link></div>
           <div className="studio-table-wrap"><table className="studio-table"><thead><tr><th>Pedido</th><th>Descripción</th><th>Cliente</th><th>Productos</th><th>Estado</th></tr></thead><tbody>
             {orders.filter((row) => row.status !== 'Entregado').slice(0, 5).map((row) => <tr key={row.id}><td>{row.number}</td><td>{row.items}</td><td>{row.customer}</td><td>{row.productCount}</td><td><StatusBadge>{row.status}</StatusBadge></td></tr>)}
-            {!openOrders && <tr><td className="studio-empty" colSpan="5">No hay pedidos abiertos.</td></tr>}
+            {!openOrders && <tr><td className="studio-empty" colSpan="5">{orders.length ? 'No hay pedidos abiertos.' : 'Aún no hay pedidos registrados.'}</td></tr>}
           </tbody></table></div>
         </section>
         <section className="studio-panel">
           <div className="studio-section-heading"><div><h2>Agenda del día</h2><p>Sesiones fotográficas</p></div><Link to="/sesiones">Abrir agenda</Link></div>
           <div className="studio-agenda">{sessions.filter((row) => row.date === today()).sort((a, b) => a.time.localeCompare(b.time)).map((row) => <article className="studio-agenda-item" key={row.id}><strong>{row.time}</strong><div><b>{row.type}</b><span>{row.customer} · {row.location}</span></div><StatusBadge>{row.status}</StatusBadge></article>)}
-            {!todaySessions && <p className="studio-empty">No hay sesiones agendadas para hoy.</p>}
+            {!todaySessions && <p className="studio-empty">No hay sesiones programadas para hoy.</p>}
           </div>
         </section>
         <section className="studio-panel">
           <div className="studio-section-heading"><div><h2>Solicitudes de fotografías</h2><p>Formatos y pedidos asociados</p></div><Link to="/impresiones">Ver solicitudes</Link></div>
           <div className="studio-table-wrap"><table className="studio-table"><thead><tr><th>Formato</th><th>Cantidad</th><th>Pedido</th><th>Cliente</th><th>Estado</th></tr></thead><tbody>
             {prints.slice(0, 4).map((row) => <tr key={row.id}><td>{row.format} · {row.size}</td><td>{row.quantity}</td><td>{row.order}</td><td>{row.customer}</td><td><StatusBadge>{row.status}</StatusBadge></td></tr>)}
-            {!prints.length && <tr><td className="studio-empty" colSpan="5">Aún no hay solicitudes.</td></tr>}
+            {!prints.length && <tr><td className="studio-empty" colSpan="5">No hay impresiones en producción.</td></tr>}
           </tbody></table></div>
         </section>
         <section className="studio-panel">
           <div className="studio-section-heading"><div><h2>Registro de personal</h2><p>Asistencia del día</p></div><Link to="/asistencia">Ver registro</Link></div>
           <div className="studio-table-wrap"><table className="studio-table"><thead><tr><th>Trabajador</th><th>Horario</th><th>Estado</th></tr></thead><tbody>
             {attendance.filter((row) => row.date === today()).map((row) => <tr key={row.id}><td>{row.employee}</td><td>{row.checkIn || '—'} – {row.checkOut || '—'}</td><td><StatusBadge>{row.status}</StatusBadge></td></tr>)}
-            {!attendance.some((row) => row.date === today()) && <tr><td className="studio-empty" colSpan="3">Sin registros para hoy.</td></tr>}
+            {!attendance.some((row) => row.date === today()) && <tr><td className="studio-empty" colSpan="3">{attendance.length ? 'Sin registros para hoy.' : 'No hay registros de asistencia.'}</td></tr>}
           </tbody></table></div>
         </section>
         <section className="studio-panel studio-catalog-panel">
           <div className="studio-section-heading"><div><h2>Catálogo disponible</h2><p>Productos y artículos para pedidos</p></div><Link to="/productos">Administrar catálogo</Link></div>
           <div className="studio-catalog">{products.filter((product) => product.availability === 'Disponible').slice(0, 5).map((product) => <article key={product.id}><strong>{product.name}</strong><span>{product.category}</span><b>${Number(product.price).toLocaleString('es-MX')}</b></article>)}
-            {!products.some((product) => product.availability === 'Disponible') && <p className="studio-empty">No hay productos disponibles.</p>}
+            {!products.some((product) => product.availability === 'Disponible') && <p className="studio-empty">{products.length ? 'No hay productos disponibles.' : 'Aún no hay productos registrados.'}</p>}
           </div>
         </section>
       </div>
@@ -323,33 +341,57 @@ export function StudioModule({ module }) {
         {module === 'sessions' && <section className="studio-session-agenda" aria-label="Agenda visual de sesiones">
           <h2>Agenda de sesiones</h2>
           <div className="studio-agenda studio-agenda-board">{rows.slice().sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`)).map((row) => <article className="studio-agenda-item" key={row.id}><strong>{row.time}</strong><div><b>{row.type}</b><span>{row.date} · {row.customer} · {row.location}</span></div><StatusBadge>{row.status}</StatusBadge></article>)}
-            {!rows.length && <p className="studio-empty">No hay sesiones programadas.</p>}
+            {!rows.length && <p className="studio-empty">{emptyMessages.sessions}</p>}
           </div>
         </section>}
         {editing && <div className="studio-form-panel"><h2>{editing.id ? `Editar ${entityLabels[module].toLowerCase()}` : config.addLabel}</h2><RecordForm config={config} initial={editing.id ? editing : undefined} onCancel={() => setEditing(null)} onSave={save} /></div>}
-        <div className="studio-table-wrap"><table className="studio-table">
-          <thead><tr>{config.columns.map(([, label]) => <th key={label}>{label}</th>)}<th>Acciones</th></tr></thead>
-          <tbody>
+        {module === 'customers' ? (
+          <div className="studio-customer-grid">
             {filtered.map((row) => (
-              <Fragment key={row.id}>
-                <tr>
-                  {config.columns.map(([key]) => <td key={key}>{key === 'status' || key === 'availability' ? (
-                    <select aria-label={`Cambiar ${config.title.toLowerCase()} ${row.number || row.name || row.employee || ''}`} className="studio-status-select" onChange={(event) => updateRecord(row.id, { [key]: event.target.value })} value={row[key] || ''}>{config.statuses.map((status) => <option key={status}>{status}</option>)}</select>
-                  ) : key === 'total' || key === 'price' ? `$${Number(row[key] || 0).toLocaleString('es-MX')}` : row[key] || '—'}</td>)}
-                  <td className="studio-row-actions">
-                    {module === 'attendance' && row.status !== 'Ausencia' && (row.checkIn ? (
-                      <button className="studio-text-button" onClick={() => { updateRecord(row.id, { checkOut: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }), status: 'Jornada completada' }); setNotice('Salida registrada.'); }} type="button">Registrar salida</button>
-                    ) : <button className="studio-text-button" onClick={() => { updateRecord(row.id, { checkIn: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }), status: 'Pendiente de salida' }); setNotice('Entrada registrada.'); }} type="button">Registrar entrada</button>)}
-                    {(module === 'customers' || module === 'orders') && <button className="studio-text-button" onClick={() => setDetailId(detailId === row.id ? null : row.id)} type="button">{detailId === row.id ? 'Ocultar detalle' : module === 'customers' ? 'Ver historial' : 'Ver detalle'}</button>}
-                    <button className="studio-text-button" onClick={() => { setEditing(row); setNotice(''); }} type="button">Editar</button>
-                  </td>
-                </tr>
-                {detailId === row.id && <tr className="studio-detail-row" key={`${row.id}-detail`}><td colSpan={config.columns.length + 1}>{recordDetail(row)}</td></tr>}
-              </Fragment>
+              <article className="studio-customer-card" key={row.id}>
+                <div className="studio-customer-card-heading">
+                  <span className="studio-customer-avatar" aria-hidden="true">{row.name.slice(0, 2).toUpperCase()}</span>
+                  <div><h2>{row.name}</h2><span>Cliente del estudio</span></div>
+                </div>
+                <dl className="studio-customer-contact">
+                  <div><dt>Teléfono</dt><dd>{row.phone || 'Sin teléfono registrado'}</dd></div>
+                  <div><dt>Correo</dt><dd>{row.email || 'Sin correo registrado'}</dd></div>
+                </dl>
+                {row.notes && <p className="studio-customer-notes">{row.notes}</p>}
+                <div className="studio-customer-actions">
+                  <button className="studio-text-button" onClick={() => setDetailId(detailId === row.id ? null : row.id)} type="button">{detailId === row.id ? 'Ocultar historial' : 'Ver historial'}</button>
+                  <button className="studio-text-button" onClick={() => { setEditing(row); setNotice(''); }} type="button">Editar cliente</button>
+                </div>
+                {detailId === row.id && recordDetail(row)}
+              </article>
             ))}
-            {!filtered.length && <tr><td className="studio-empty" colSpan={config.columns.length + 1}>No se encontraron registros. Puedes crear uno nuevo.</td></tr>}
-          </tbody>
-        </table></div>
+            {!filtered.length && <p className="studio-empty">{rows.length ? 'No se encontraron clientes con esa búsqueda.' : `${emptyMessages.customers} Puedes registrar uno nuevo.`}</p>}
+          </div>
+        ) : (
+          <div className="studio-table-wrap"><table className="studio-table">
+            <thead><tr>{config.columns.map(([, label]) => <th key={label}>{label}</th>)}<th>Acciones</th></tr></thead>
+            <tbody>
+              {filtered.map((row) => (
+                <Fragment key={row.id}>
+                  <tr>
+                    {config.columns.map(([key]) => <td key={key}>{key === 'status' || key === 'availability' ? (
+                      <select aria-label={`Cambiar ${config.title.toLowerCase()} ${row.number || row.name || row.employee || ''}`} className="studio-status-select" onChange={(event) => updateRecord(row.id, { [key]: event.target.value })} value={row[key] || ''}>{config.statuses.map((status) => <option key={status}>{status}</option>)}</select>
+                    ) : key === 'total' || key === 'price' ? `$${Number(row[key] || 0).toLocaleString('es-MX')}` : row[key] || '—'}</td>)}
+                    <td className="studio-row-actions">
+                      {module === 'attendance' && row.status !== 'Ausencia' && (row.checkIn ? (
+                        <button className="studio-text-button" onClick={() => { updateRecord(row.id, { checkOut: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }), status: 'Jornada completada' }); setNotice('Salida registrada.'); }} type="button">Registrar salida</button>
+                      ) : <button className="studio-text-button" onClick={() => { updateRecord(row.id, { checkIn: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }), status: 'Pendiente de salida' }); setNotice('Entrada registrada.'); }} type="button">Registrar entrada</button>)}
+                      {module === 'orders' && <button className="studio-text-button" onClick={() => setDetailId(detailId === row.id ? null : row.id)} type="button">{detailId === row.id ? 'Ocultar detalle' : 'Ver detalle'}</button>}
+                      <button className="studio-text-button" onClick={() => { setEditing(row); setNotice(''); }} type="button">Editar</button>
+                    </td>
+                  </tr>
+                  {detailId === row.id && <tr className="studio-detail-row" key={`${row.id}-detail`}><td colSpan={config.columns.length + 1}>{recordDetail(row)}</td></tr>}
+                </Fragment>
+              ))}
+              {!filtered.length && <tr><td className="studio-empty" colSpan={config.columns.length + 1}>{rows.length ? 'No se encontraron registros con esos filtros.' : `${emptyMessages[module]} Puedes crear uno nuevo.`}</td></tr>}
+            </tbody>
+          </table></div>
+        )}
       </section>
       <p className="studio-local-note">Los cambios de esta vista se guardan localmente en este navegador.</p>
     </div>

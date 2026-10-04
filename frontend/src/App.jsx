@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Images, LayoutDashboard, Package, Users, UserCheck } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Images, LayoutDashboard, Menu, Package, Users, UserCheck, X } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginScreen from './screens/LoginScreen';
@@ -44,6 +44,7 @@ function WorkspaceLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('foto-minerva-sidebar-collapsed') === 'true');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const currentPage = navigationItems.find(({ to }) => to === location.pathname)?.label || 'Estado de la API';
   const displayName = user?.name || user?.email || 'Usuario';
   const initials = displayName.slice(0, 2).toUpperCase();
@@ -64,14 +65,18 @@ function WorkspaceLayout() {
   };
 
   return (
-    <div className={`app-shell${collapsed ? ' sidebar-collapsed' : ''}`}>
+    <div className={`app-shell${collapsed ? ' sidebar-collapsed' : ''}${mobileMenuOpen ? ' mobile-nav-open' : ''}`}>
+      {mobileMenuOpen && <button aria-label="Cerrar menú" className="mobile-nav-backdrop" onClick={() => setMobileMenuOpen(false)} type="button" />}
       <aside className="sidebar">
         <div className="sidebar-brand-row">
-          <NavLink className="sidebar-brand" to="/dashboard" aria-label="Foto Minerva, panel general">
+          <NavLink className="sidebar-brand" onClick={() => setMobileMenuOpen(false)} to="/dashboard" aria-label="Foto Minerva, panel general">
             <Brand compact={collapsed} />
           </NavLink>
           <button className="sidebar-toggle" type="button" onClick={toggleSidebar} aria-label={collapsed ? 'Desplegar menú' : 'Contraer menú'} title={collapsed ? 'Desplegar menú' : 'Contraer menú'}>
             {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
+          <button className="mobile-sidebar-close" type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Cerrar menú">
+            <X size={20} />
           </button>
         </div>
 
@@ -82,6 +87,7 @@ function WorkspaceLayout() {
               className={({ isActive }) => `navigation-link${isActive ? ' is-active' : ''}`}
               end={end}
               key={to}
+              onClick={() => setMobileMenuOpen(false)}
               title={collapsed ? label : undefined}
               to={to}
             >
@@ -92,7 +98,7 @@ function WorkspaceLayout() {
         </nav>
 
         <div className="sidebar-bottom">
-          <NavLink className="navigation-link" to="/health">
+          <NavLink className="navigation-link" onClick={() => setMobileMenuOpen(false)} to="/health">
             <span className="navigation-icon" aria-hidden="true">•</span>
             <span className="navigation-text">Estado de la API</span>
           </NavLink>
@@ -103,6 +109,15 @@ function WorkspaceLayout() {
       <div className="workspace">
         <header className="topbar">
           <div className="topbar-brand">
+            <button
+              aria-expanded={mobileMenuOpen}
+              aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+              className="mobile-nav-toggle"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              type="button"
+            >
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
             <Brand compact />
             <div className="breadcrumb">
               <span>Estudio</span>
@@ -136,7 +151,7 @@ function WorkspaceLayout() {
 }
 
 export default function App() {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   const location = useLocation();
 
   if (status === 'loading' && location.pathname !== '/' && location.pathname !== '/inicio') {
@@ -160,7 +175,7 @@ export default function App() {
         path="/register"
         element={isAuthenticated ? <Navigate replace to="/dashboard" /> : <RegisterScreen />}
       />
-      <Route element={<ProtectedRoute><WorkspaceLayout /></ProtectedRoute>}>
+      <Route element={<ProtectedRoute><WorkspaceLayout key={user?.id || user?._id} /></ProtectedRoute>}>
         <Route path="dashboard" element={<StudioDashboard />} />
         <Route path="pedidos" element={<StudioModule module="orders" />} />
         <Route path="productos" element={<StudioModule module="products" />} />
