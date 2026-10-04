@@ -155,19 +155,26 @@ export default function App() {
   const { status, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const isAuthenticated = status === 'authenticated';
 
   useEffect(() => {
     let listener;
     CapacitorApp.addListener('backButton', ({ canGoBack }) => {
       const path = location.pathname;
-      const isRoot = path === '/' || path === '/inicio' || path === '/dashboard' || path === '/login' || path === '/register';
+      const isAuthenticatedRoot = isAuthenticated && path === '/dashboard';
+      const isPublicRoot = path === '/' || path === '/inicio' || path === '/login' || path === '/register';
 
-      if (canGoBack || (!isRoot && window.history.length > 1)) {
-        navigate(-1);
-      } else if (isRoot) {
+      if (isAuthenticatedRoot) {
         CapacitorApp.exitApp();
-      } else {
+        return;
+      }
+
+      if (canGoBack || (!isPublicRoot && window.history.length > 1)) {
+        navigate(-1);
+      } else if (isAuthenticated) {
         navigate('/dashboard', { replace: true });
+      } else {
+        CapacitorApp.exitApp();
       }
     }).then((l) => {
       listener = l;
@@ -178,13 +185,11 @@ export default function App() {
         listener.remove();
       }
     };
-  }, [location, navigate]);
+  }, [isAuthenticated, location, navigate]);
 
   if (status === 'loading' && location.pathname !== '/' && location.pathname !== '/inicio') {
     return <div className="session-loading" role="status">Validando sesión...</div>;
   }
-
-  const isAuthenticated = status === 'authenticated';
 
   return (
     <Routes>
