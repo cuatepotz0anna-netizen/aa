@@ -187,7 +187,7 @@ export default function App() {
     };
   }, [isAuthenticated, location, navigate]);
 
-  if (status === 'loading' && location.pathname !== '/' && location.pathname !== '/inicio') {
+  if (status === 'loading') {
     return <div className="session-loading" role="status">Validando sesión...</div>;
   }
 
@@ -195,9 +195,12 @@ export default function App() {
     <Routes>
       <Route
         path="/"
-        element={<LandingPage />}
+        element={isAuthenticated ? <Navigate replace to="/dashboard" /> : <LandingPage />}
       />
-      <Route path="/inicio" element={<LandingPage />} />
+      <Route
+        path="/inicio"
+        element={isAuthenticated ? <Navigate replace to="/dashboard" /> : <LandingPage />}
+      />
       <Route
         path="/login"
         element={isAuthenticated ? <Navigate replace to="/dashboard" /> : <LoginScreen />}
