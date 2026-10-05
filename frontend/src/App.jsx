@@ -4,6 +4,8 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Images, LayoutDashboard, Menu, Package, Users, UserCheck, X } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
+import ResetPasswordScreen from './screens/ResetPasswordScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import LandingPage from './screens/LandingPage';
@@ -204,6 +206,18 @@ export default function App() {
       <Route
         path="/login"
         element={isAuthenticated ? <Navigate replace to="/dashboard" /> : <LoginScreen />}
+      />
+      <Route
+        path="/forgot-password"
+        element={isAuthenticated ? <Navigate replace to="/dashboard" /> : <ForgotPasswordScreen />}
+      />
+      <Route
+        path="/reset-password"
+        element={
+          isAuthenticated
+            ? <Navigate replace to="/dashboard" />
+            : <ResetPasswordScreen />
+        } 
       />
       <Route
         path="/register"
