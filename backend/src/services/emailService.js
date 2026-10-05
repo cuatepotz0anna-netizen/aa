@@ -4,7 +4,6 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 const EMAIL_FROM = process.env.EMAIL_FROM || 'onboarding@resend.dev';
 const EMAIL_TEST_TO = process.env.EMAIL_TEST_TO || null;
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 async function sendEmail({ to, subject, html }) {
   if (!to) {
@@ -14,9 +13,7 @@ async function sendEmail({ to, subject, html }) {
   const originalRecipient = to;
 
   const finalRecipient =
-    !IS_PRODUCTION && EMAIL_TEST_TO
-      ? EMAIL_TEST_TO
-      : originalRecipient;
+  EMAIL_TEST_TO || originalRecipient;
 
   const developmentNotice =
     finalRecipient !== originalRecipient
