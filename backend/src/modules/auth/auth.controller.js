@@ -4,7 +4,13 @@ const jwt = require('jsonwebtoken');
 const User = require('../users/user.model');
 const Role = require('../roles/role.model');
 const Session = require('./session.model');
+const {
+  sendWelcomeEmail,
+  sendPasswordResetEmail,
+  sendPasswordChangedEmail,
+} = require('../../services/emailService');
 const { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_TOKEN_TTL } = require('../../config/jwt');
+
 
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
@@ -129,6 +135,14 @@ const register = async (req, res, next) => {
     });
 
     const { accessToken, refreshToken } = await issueSessionPair(user);
+    try {
+  await sendWelcomeEmail({
+    to: user.email,
+    name: user.name,
+  });
+} catch (emailError) {
+  console.error('Welcome email failed:', emailError.message);
+}
 
     return res.status(201).json({
       success: true,
@@ -139,6 +153,123 @@ const register = async (req, res, next) => {
         refreshToken,
         user: sanitizeUser(user),
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body || {};
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required',
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({
+      email: normalizedEmail,
+      isActive: true,
+    });
+
+    // Respuesta genérica por seguridad, exista o no el correo
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message:
+          'If an account exists with that email, password reset instructions have been sent.',
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = hashToken(resetToken);
+
+    user.passwordResetToken = resetTokenHash;
+    user.passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000);
+
+    await user.save();
+
+    const frontendUrl =
+      process.env.CLIENT_URL || 'http://localhost:5173';
+
+    const resetUrl =
+      `${frontendUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(
+        user.email
+      )}`;
+
+    try {
+      await sendPasswordResetEmail({
+        to: user.email,
+        name: user.name,
+        resetUrl,
+      });
+    } catch (emailError) {
+      console.error('Password reset email failed:', emailError.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message:
+        'If an account exists with that email, password reset instructions have been sent.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, email, password } = req.body || {};
+
+    if (!token || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token, email and new password are required',
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const tokenHash = hashToken(token);
+
+    const user = await User.findOne({
+      email: normalizedEmail,
+      passwordResetToken: tokenHash,
+      passwordResetExpires: { $gt: new Date() },
+      isActive: true,
+    }).select('+passwordResetToken +passwordResetExpires');
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password reset token is invalid or has expired',
+      });
+    }
+
+    user.password = password;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+
+    await user.save();
+
+    await revokeUserSessions(user._id);
+
+    try {
+  await sendPasswordChangedEmail({
+    to: user.email,
+    name: user.name,
+  });
+} catch (emailError) {
+  console.error('Password changed email failed:', emailError.message);
+}
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password updated successfully',
     });
   } catch (error) {
     next(error);
@@ -315,6 +446,8 @@ const logout = async (req, res, next) => {
 
 module.exports = {
   register,
+  forgotPassword,
+  resetPassword,
   login,
   profile,
   refresh,

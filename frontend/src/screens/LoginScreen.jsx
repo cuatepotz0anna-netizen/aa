@@ -58,6 +58,11 @@ export default function LoginScreen() {
             onChange={onChange}
             required
           />
+          <div className="forgot-password-row">
+            <Link to="/forgot-password">
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
         </div>
         <div className="field-group">
           <label htmlFor="login-password">Contraseña</label>
