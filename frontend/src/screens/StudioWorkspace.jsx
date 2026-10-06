@@ -661,6 +661,39 @@ useEffect(() => {
   loadSessions();
 }, [module, token]);
 
+useEffect(() => {
+  if (module !== 'orders' || !token) return;
+
+  const loadOrders = async () => {
+    try {
+      const response = await fetch(`${API_URL}/orders`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'No se pudieron cargar los pedidos.'
+        );
+      }
+
+      const orders = (data.data?.orders || []).map((order) => ({
+        ...order,
+        id: order._id,
+      }));
+
+      setRows(orders);
+    } catch (error) {
+      setNotice(error.message);
+    }
+  };
+
+  loadOrders();
+}, [module, token]);
+
   useEffect(() => {
     const handlePopState = () => {
       if (editing) {
@@ -878,6 +911,65 @@ useEffect(() => {
       return;
     }
   }
+
+  if (module === 'orders') {
+  try {
+    const isEditing = Boolean(editing?.id);
+
+    const response = await fetch(
+      isEditing
+        ? `${API_URL}/orders/${editing.id}`
+        : `${API_URL}/orders`,
+      {
+        method: isEditing ? 'PUT' : 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'No se pudo guardar el pedido.'
+      );
+    }
+
+    const order = data.data?.order;
+
+    if (order) {
+      const normalizedOrder = {
+        ...order,
+        id: order._id,
+      };
+
+      setRows((current) => {
+        if (isEditing) {
+          return current.map((row) =>
+            row.id === editing.id ? normalizedOrder : row
+          );
+        }
+
+        return [normalizedOrder, ...current];
+      });
+    }
+
+    setNotice(
+      isEditing
+        ? 'Pedido actualizado correctamente.'
+        : 'Pedido guardado correctamente.'
+    );
+
+    setEditing(null);
+    return;
+  } catch (error) {
+    setNotice(error.message);
+    return;
+  }
+}
 
   if (editing?.id) {
     setRows((current) =>
