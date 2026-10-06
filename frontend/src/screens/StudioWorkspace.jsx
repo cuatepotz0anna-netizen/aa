@@ -727,6 +727,39 @@ useEffect(() => {
   loadPrints();
 }, [module, token]);
 
+useEffect(() => {
+  if (module !== 'attendance' || !token) return;
+
+  const loadAttendance = async () => {
+    try {
+      const response = await fetch(`${API_URL}/attendance`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'No se pudo cargar la asistencia.'
+        );
+      }
+
+      const attendance = (data.data?.attendance || []).map((record) => ({
+        ...record,
+        id: record._id,
+      }));
+
+      setRows(attendance);
+    } catch (error) {
+      setNotice(error.message);
+    }
+  };
+
+  loadAttendance();
+}, [module, token]);
+
   useEffect(() => {
     const handlePopState = () => {
       if (editing) {
@@ -1053,6 +1086,64 @@ if (module === 'prints') {
       isEditing
         ? 'Impresión actualizada correctamente.'
         : 'Impresión guardada correctamente.'
+    );
+
+    setEditing(null);
+    return;
+  } catch (error) {
+    setNotice(error.message);
+    return;
+  }
+}
+if (module === 'attendance') {
+  try {
+    const isEditing = Boolean(editing?.id);
+
+    const response = await fetch(
+      isEditing
+        ? `${API_URL}/attendance/${editing.id}`
+        : `${API_URL}/attendance`,
+      {
+        method: isEditing ? 'PUT' : 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'No se pudo guardar la asistencia.'
+      );
+    }
+
+    const attendance = data.data?.attendance;
+
+    if (attendance) {
+      const normalizedAttendance = {
+        ...attendance,
+        id: attendance._id,
+      };
+
+      setRows((current) => {
+        if (isEditing) {
+          return current.map((row) =>
+            row.id === editing.id ? normalizedAttendance : row
+          );
+        }
+
+        return [normalizedAttendance, ...current];
+      });
+    }
+
+    setNotice(
+      isEditing
+        ? 'Asistencia actualizada correctamente.'
+        : 'Asistencia guardada correctamente.'
     );
 
     setEditing(null);
