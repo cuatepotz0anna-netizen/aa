@@ -694,6 +694,39 @@ useEffect(() => {
   loadOrders();
 }, [module, token]);
 
+useEffect(() => {
+  if (module !== 'prints' || !token) return;
+
+  const loadPrints = async () => {
+    try {
+      const response = await fetch(`${API_URL}/prints`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'No se pudieron cargar las impresiones.'
+        );
+      }
+
+      const prints = (data.data?.prints || []).map((print) => ({
+        ...print,
+        id: print._id,
+      }));
+
+      setRows(prints);
+    } catch (error) {
+      setNotice(error.message);
+    }
+  };
+
+  loadPrints();
+}, [module, token]);
+
   useEffect(() => {
     const handlePopState = () => {
       if (editing) {
@@ -961,6 +994,65 @@ useEffect(() => {
       isEditing
         ? 'Pedido actualizado correctamente.'
         : 'Pedido guardado correctamente.'
+    );
+
+    setEditing(null);
+    return;
+  } catch (error) {
+    setNotice(error.message);
+    return;
+  }
+}
+
+if (module === 'prints') {
+  try {
+    const isEditing = Boolean(editing?.id);
+
+    const response = await fetch(
+      isEditing
+        ? `${API_URL}/prints/${editing.id}`
+        : `${API_URL}/prints`,
+      {
+        method: isEditing ? 'PUT' : 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'No se pudo guardar la impresión.'
+      );
+    }
+
+    const print = data.data?.print;
+
+    if (print) {
+      const normalizedPrint = {
+        ...print,
+        id: print._id,
+      };
+
+      setRows((current) => {
+        if (isEditing) {
+          return current.map((row) =>
+            row.id === editing.id ? normalizedPrint : row
+          );
+        }
+
+        return [normalizedPrint, ...current];
+      });
+    }
+
+    setNotice(
+      isEditing
+        ? 'Impresión actualizada correctamente.'
+        : 'Impresión guardada correctamente.'
     );
 
     setEditing(null);
