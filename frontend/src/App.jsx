@@ -213,11 +213,7 @@ export default function App() {
       />
       <Route
         path="/reset-password"
-        element={
-          isAuthenticated
-            ? <Navigate replace to="/dashboard" />
-            : <ResetPasswordScreen />
-        } 
+        element={<ResetPasswordScreen />}
       />
       <Route
         path="/register"
