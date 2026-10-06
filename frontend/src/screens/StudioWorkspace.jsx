@@ -628,6 +628,39 @@ useEffect(() => {
   loadProducts();
 }, [module, token]);
 
+useEffect(() => {
+  if (module !== 'sessions' || !token) return;
+
+  const loadSessions = async () => {
+    try {
+      const response = await fetch(`${API_URL}/sessions`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'No se pudieron cargar las sesiones.'
+        );
+      }
+
+      const sessions = (data.data?.sessions || []).map((session) => ({
+        ...session,
+        id: session._id,
+      }));
+
+      setRows(sessions);
+    } catch (error) {
+      setNotice(error.message);
+    }
+  };
+
+  loadSessions();
+}, [module, token]);
+
   useEffect(() => {
     const handlePopState = () => {
       if (editing) {
@@ -670,64 +703,6 @@ useEffect(() => {
 
   const save = async (form) => {
   if (module === 'customers') {
-    if (module === 'products') {
-  try {
-    const isEditing = Boolean(editing?.id);
-
-    const response = await fetch(
-      isEditing
-        ? `${API_URL}/products/${editing.id}`
-        : `${API_URL}/products`,
-      {
-        method: isEditing ? 'PUT' : 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(form),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.message || 'No se pudo guardar el producto.'
-      );
-    }
-
-    const product = data.data?.product;
-
-    if (product) {
-      const normalizedProduct = {
-        ...product,
-        id: product._id,
-      };
-
-      setRows((current) => {
-        if (isEditing) {
-          return current.map((row) =>
-            row.id === editing.id ? normalizedProduct : row
-          );
-        }
-
-        return [normalizedProduct, ...current];
-      });
-    }
-
-    setNotice(
-      isEditing
-        ? 'Producto actualizado correctamente.'
-        : 'Producto guardado correctamente.'
-    );
-
-    setEditing(null);
-    return;
-  } catch (error) {
-    setNotice(error.message);
-    return;
-  }
-}
     try {
       const isEditing = Boolean(editing?.id);
 
@@ -776,6 +751,124 @@ useEffect(() => {
         isEditing
           ? 'Cliente actualizado correctamente.'
           : 'Cliente guardado correctamente.'
+      );
+
+      setEditing(null);
+      return;
+    } catch (error) {
+      setNotice(error.message);
+      return;
+    }
+  }
+
+  if (module === 'products') {
+    try {
+      const isEditing = Boolean(editing?.id);
+
+      const response = await fetch(
+        isEditing
+          ? `${API_URL}/products/${editing.id}`
+          : `${API_URL}/products`,
+        {
+          method: isEditing ? 'PUT' : 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(form),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'No se pudo guardar el producto.'
+        );
+      }
+
+      const product = data.data?.product;
+
+      if (product) {
+        const normalizedProduct = {
+          ...product,
+          id: product._id,
+        };
+
+        setRows((current) => {
+          if (isEditing) {
+            return current.map((row) =>
+              row.id === editing.id ? normalizedProduct : row
+            );
+          }
+
+          return [normalizedProduct, ...current];
+        });
+      }
+
+      setNotice(
+        isEditing
+          ? 'Producto actualizado correctamente.'
+          : 'Producto guardado correctamente.'
+      );
+
+      setEditing(null);
+      return;
+    } catch (error) {
+      setNotice(error.message);
+      return;
+    }
+  }
+
+  if (module === 'sessions') {
+    try {
+      const isEditing = Boolean(editing?.id);
+
+      const response = await fetch(
+        isEditing
+          ? `${API_URL}/sessions/${editing.id}`
+          : `${API_URL}/sessions`,
+        {
+          method: isEditing ? 'PUT' : 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(form),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'No se pudo guardar la sesión.'
+        );
+      }
+
+      const session = data.data?.session;
+
+      if (session) {
+        const normalizedSession = {
+          ...session,
+          id: session._id,
+        };
+
+        setRows((current) => {
+          if (isEditing) {
+            return current.map((row) =>
+              row.id === editing.id ? normalizedSession : row
+            );
+          }
+
+          return [normalizedSession, ...current];
+        });
+      }
+
+      setNotice(
+        isEditing
+          ? 'Sesión actualizada correctamente.'
+          : 'Sesión guardada correctamente.'
       );
 
       setEditing(null);

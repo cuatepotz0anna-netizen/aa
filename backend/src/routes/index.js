@@ -19,6 +19,7 @@ router.use('/auth', (req, res, next) => {
 router.use('/users', require('../modules/users/user.routes'));
 router.use('/customers', require('../modules/customers/customer.routes'));
 router.use('/products', require('../modules/products/product.routes'));
+router.use('/sessions', require('../modules/sessions/session.routes'));
 
 router.get('/health', (req, res) => {
   res.status(200).json({
