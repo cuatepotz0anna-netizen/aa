@@ -195,12 +195,15 @@ const forgotPassword = async (req, res, next) => {
     await user.save();
 
     const frontendUrl =
-      process.env.CLIENT_URL || 'http://localhost:5173';
+  process.env.CLIENT_URL ||
+  (process.env.NODE_ENV === 'production'
+    ? 'https://aa-6xy.pages.dev'
+    : 'http://localhost:5173');
 
     const resetUrl =
-      `${frontendUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(
-        user.email
-      )}`;
+  `${frontendUrl}/#/reset-password?token=${resetToken}&email=${encodeURIComponent(
+    user.email
+  )}`;
 
     try {
       await sendPasswordResetEmail({
