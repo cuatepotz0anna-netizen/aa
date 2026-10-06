@@ -1394,7 +1394,9 @@ if (module === 'attendance') {
             {filtered.map((row) => (
               <article className="studio-customer-card" key={row.id}>
                 <div className="studio-customer-card-heading">
-                  <span className="studio-customer-avatar" aria-hidden="true">{row.name.slice(0, 2).toUpperCase()}</span>
+                  <span className="studio-customer-avatar" aria-hidden="true">
+                    {String(row.name || 'CL').slice(0, 2).toUpperCase()}
+                  </span>
                   <div><h2>{row.name}</h2><span>Cliente del estudio</span></div>
                 </div>
                 <dl className="studio-customer-contact">
