@@ -22,6 +22,7 @@ router.use('/products', require('../modules/products/product.routes'));
 router.use('/sessions', require('../modules/sessions/session.routes'));
 router.use('/orders', require('../modules/orders/order.routes'));
 router.use('/prints', require('../modules/prints/print.routes'));
+router.use('/attendance', require('../modules/attendance/attendance.routes'));
 
 router.get('/health', (req, res) => {
   res.status(200).json({
