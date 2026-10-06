@@ -595,6 +595,39 @@ export function StudioModule({ module }) {
   loadCustomers();
 }, [module, token]);
 
+useEffect(() => {
+  if (module !== 'products' || !token) return;
+
+  const loadProducts = async () => {
+    try {
+      const response = await fetch(`${API_URL}/products`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'No se pudieron cargar los productos.'
+        );
+      }
+
+      const products = (data.data?.products || []).map((product) => ({
+        ...product,
+        id: product._id,
+      }));
+
+      setRows(products);
+    } catch (error) {
+      setNotice(error.message);
+    }
+  };
+
+  loadProducts();
+}, [module, token]);
+
   useEffect(() => {
     const handlePopState = () => {
       if (editing) {
@@ -637,6 +670,64 @@ export function StudioModule({ module }) {
 
   const save = async (form) => {
   if (module === 'customers') {
+    if (module === 'products') {
+  try {
+    const isEditing = Boolean(editing?.id);
+
+    const response = await fetch(
+      isEditing
+        ? `${API_URL}/products/${editing.id}`
+        : `${API_URL}/products`,
+      {
+        method: isEditing ? 'PUT' : 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'No se pudo guardar el producto.'
+      );
+    }
+
+    const product = data.data?.product;
+
+    if (product) {
+      const normalizedProduct = {
+        ...product,
+        id: product._id,
+      };
+
+      setRows((current) => {
+        if (isEditing) {
+          return current.map((row) =>
+            row.id === editing.id ? normalizedProduct : row
+          );
+        }
+
+        return [normalizedProduct, ...current];
+      });
+    }
+
+    setNotice(
+      isEditing
+        ? 'Producto actualizado correctamente.'
+        : 'Producto guardado correctamente.'
+    );
+
+    setEditing(null);
+    return;
+  } catch (error) {
+    setNotice(error.message);
+    return;
+  }
+}
     try {
       const isEditing = Boolean(editing?.id);
 
