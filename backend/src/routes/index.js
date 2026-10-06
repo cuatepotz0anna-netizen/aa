@@ -17,6 +17,7 @@ router.use('/auth', (req, res, next) => {
 }, require('../modules/auth/auth.routes'));
 
 router.use('/users', require('../modules/users/user.routes'));
+router.use('/customers', require('../modules/customers/customer.routes'));
 
 router.get('/health', (req, res) => {
   res.status(200).json({
@@ -50,5 +51,6 @@ router.get('/seed-defaults', protect, authorize('ADMIN'), async (req, res, next)
     return next(error);
   }
 });
+
 
 module.exports = router;

@@ -15,6 +15,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './StudioWorkspace.css';
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV
+  ? 'http://localhost:5000/api'
+  : 'https://apta-backend-e3t7.onrender.com/api');
 
 const today = () => {
   const date = new Date();
@@ -546,6 +549,7 @@ export function StudioDashboard() {
 }
 
 export function StudioModule({ module }) {
+  const { token } = useAuth();
   const config = entityConfig[module];
   const Icon = moduleIcons[module];
   const [rows, setRows] = useCollection(module);
@@ -557,6 +561,39 @@ export function StudioModule({ module }) {
   const [editing, setEditing] = useState(null);
   const [detailId, setDetailId] = useState(null);
   const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+  if (module !== 'customers' || !token) return;
+
+  const loadCustomers = async () => {
+    try {
+      const response = await fetch(`${API_URL}/customers`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'No se pudieron cargar los clientes.'
+        );
+      }
+
+      const customers = (data.data?.customers || []).map((customer) => ({
+        ...customer,
+        id: customer._id,
+      }));
+
+      setRows(customers);
+    } catch (error) {
+      setNotice(error.message);
+    }
+  };
+
+  loadCustomers();
+}, [module, token]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -598,19 +635,101 @@ export function StudioModule({ module }) {
     return matchesQuery && (!statusFilter || row.status === statusFilter || row.availability === statusFilter);
   }), [query, rows, statusFilter]);
 
-  const save = (form) => {
-    if (editing?.id) {
-      setRows((current) => current.map((row) => row.id === editing.id ? { ...form, id: editing.id } : row));
-      setNotice(`${entityLabels[module]} actualizado correctamente.`);
-    } else {
-      const row = { ...form, id: `${module}-${Date.now()}` };
-      if (module === 'orders' && !row.number) row.number = `FM-${String(Date.now()).slice(-5)}`;
-      if (module === 'attendance' && !row.status) row.status = 'Pendiente de salida';
-      setRows((current) => [row, ...current]);
-      setNotice(`${entityLabels[module]} guardado correctamente.`);
+  const save = async (form) => {
+  if (module === 'customers') {
+    try {
+      const isEditing = Boolean(editing?.id);
+
+      const response = await fetch(
+        isEditing
+          ? `${API_URL}/customers/${editing.id}`
+          : `${API_URL}/customers`,
+        {
+          method: isEditing ? 'PUT' : 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(form),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'No se pudo guardar el cliente.'
+        );
+      }
+
+      const customer = data.data?.customer;
+
+      if (customer) {
+        const normalizedCustomer = {
+          ...customer,
+          id: customer._id,
+        };
+
+        setRows((current) => {
+          if (isEditing) {
+            return current.map((row) =>
+              row.id === editing.id ? normalizedCustomer : row
+            );
+          }
+
+          return [normalizedCustomer, ...current];
+        });
+      }
+
+      setNotice(
+        isEditing
+          ? 'Cliente actualizado correctamente.'
+          : 'Cliente guardado correctamente.'
+      );
+
+      setEditing(null);
+      return;
+    } catch (error) {
+      setNotice(error.message);
+      return;
     }
-    setEditing(null);
-  };
+  }
+
+  if (editing?.id) {
+    setRows((current) =>
+      current.map((row) =>
+        row.id === editing.id
+          ? { ...form, id: editing.id }
+          : row
+      )
+    );
+
+    setNotice(
+      `${entityLabels[module]} actualizado correctamente.`
+    );
+  } else {
+    const row = {
+      ...form,
+      id: `${module}-${Date.now()}`,
+    };
+
+    if (module === 'orders' && !row.number) {
+      row.number = `FM-${String(Date.now()).slice(-5)}`;
+    }
+
+    if (module === 'attendance' && !row.status) {
+      row.status = 'Pendiente de salida';
+    }
+
+    setRows((current) => [row, ...current]);
+
+    setNotice(
+      `${entityLabels[module]} guardado correctamente.`
+    );
+  }
+
+  setEditing(null);
+};
 
   const updateRecord = (id, changes) => setRows((current) => current.map((row) => row.id === id ? { ...row, ...changes } : row));
 
