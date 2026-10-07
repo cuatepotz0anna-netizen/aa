@@ -549,7 +549,9 @@ export function StudioDashboard() {
 }
 
 export function StudioModule({ module }) {
+
   const { token } = useAuth();
+
   const config = entityConfig[module];
   const Icon = moduleIcons[module];
   const [rows, setRows] = useCollection(module);
@@ -1192,6 +1194,59 @@ if (module === 'attendance') {
 
   const updateRecord = (id, changes) => setRows((current) => current.map((row) => row.id === id ? { ...row, ...changes } : row));
 
+  const handleDeleteRecord = async (record) => {
+  if (module === 'attendance') return;
+
+  const confirmed = window.confirm(
+    `¿Seguro que deseas eliminar este ${entityLabels[module].toLowerCase()}?`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const endpoints = {
+      customers: 'customers',
+      products: 'products',
+      sessions: 'sessions',
+      orders: 'orders',
+      prints: 'prints',
+    };
+
+    const endpoint = endpoints[module];
+
+    if (!endpoint) return;
+
+    const response = await fetch(`${API_URL}/${endpoint}/${record.id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'No se pudo eliminar el registro.'
+      );
+    }
+
+    setRows((current) =>
+      current.filter((row) => row.id !== record.id)
+    );
+
+    setNotice(
+      `${entityLabels[module]} eliminado correctamente.`
+    );
+
+    if (detailId === record.id) {
+      setDetailId(null);
+    }
+  } catch (error) {
+    setNotice(error.message);
+  }
+};
+
   const handleGeneratePdf = async (row) => {
     try {
       if (module === 'orders') {
@@ -1408,6 +1463,13 @@ if (module === 'attendance') {
                   <button className="studio-text-button" onClick={() => handleToggleDetail(row.id)} type="button">{detailId === row.id ? 'Cerrar historial' : 'Ver historial'}</button>
                   <button className="studio-text-button" onClick={() => handleGeneratePdf(row)} type="button">Generar PDF</button>
                   <button className="studio-text-button" onClick={() => handleOpenEdit(row)} type="button">Editar cliente</button>
+                  <button
+                    className="studio-text-button"
+                    onClick={() => handleDeleteRecord(row)}
+                    type="button"
+                  >
+                    Eliminar
+                </button>
                 </div>
                 {detailId === row.id && recordDetail(row)}
               </article>
@@ -1431,6 +1493,15 @@ if (module === 'attendance') {
                       {module === 'orders' && <button className="studio-text-button" onClick={() => handleGeneratePdf(row)} type="button">Generar PDF</button>}
                       <button className="studio-text-button" onClick={() => handleToggleDetail(row.id)} type="button">{detailId === row.id ? 'Cerrar detalle' : 'Ver detalle'}</button>
                       <button className="studio-text-button" onClick={() => handleOpenEdit(row)} type="button">Editar</button>
+                      {module !== 'attendance' && (
+                        <button
+                          className="studio-text-button"
+                          onClick={() => handleDeleteRecord(row)}
+                          type="button"
+                        >
+                          Eliminar
+                        </button>
+                      )}
                     </td>
                   </tr>
                   {detailId === row.id && <tr className="studio-detail-row" key={`${row.id}-detail`}><td colSpan={config.columns.length + 1}>{recordDetail(row)}</td></tr>}
