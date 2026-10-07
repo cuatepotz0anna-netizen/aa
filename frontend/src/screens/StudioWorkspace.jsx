@@ -775,10 +775,16 @@ useEffect(() => {
   }, [editing, detailId]);
 
   const handleOpenEdit = (record) => {
-    window.history.pushState({ modal: true }, '');
-    setEditing(record);
-    setNotice('');
-  };
+  window.history.pushState({ modal: true }, '');
+  setEditing(record);
+  setNotice('');
+
+  setTimeout(() => {
+    document
+      .querySelector('.studio-form')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+};
 
   const handleCancelEdit = () => {
     if (editing) window.history.back();
