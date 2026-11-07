@@ -139,6 +139,17 @@ function WorkspaceLayout() {
               <span className="account-chevron" aria-hidden="true">⌄</span>
             </summary>
             <div className="account-dropdown">
+              <button
+                type="button"
+                className="account-dropdown-close"
+                aria-label="Cerrar panel"
+                title="Cerrar"
+                onClick={(event) => {
+                  event.currentTarget.closest('details')?.removeAttribute('open');
+                }}
+              >
+                <span>×</span>
+              </button>
               <p>Sesión iniciada como</p>
               <strong>{displayName}</strong>
               <button type="button" onClick={() => navigate('/cambiar-contrasena')}>Cambiar contraseña</button>
