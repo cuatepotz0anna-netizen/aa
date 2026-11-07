@@ -209,6 +209,27 @@ button, a, summary { -webkit-tap-highlight-color: transparent; }
 .account-dropdown p { margin: 0; color: var(--muted); font-size: 11px; }
 .account-dropdown strong { overflow: hidden; margin-bottom: 8px; font-size: 12px; text-overflow: ellipsis; }
 .account-dropdown button { padding: 9px 10px; color: var(--rose-700); background: #fff; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font-size: 12px; text-align: left; }
+.account-dropdown .account-dropdown-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  left: auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--rose-700);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+}
+.account-dropdown .account-dropdown-close:hover {
+  background: var(--rose-50);
+}
 .account-dropdown button:hover { background: var(--rose-50); }
 
 .main-content { padding: 27px 24px 42px; }
