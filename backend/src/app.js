@@ -43,7 +43,10 @@ app.use(
     max: 200,
     standardHeaders: true,
     legacyHeaders: false,
-    message: 'Too many requests from this IP, please try again later.',
+    handler: (req, res) => res.status(429).json({
+      success: false,
+      message: 'Se realizaron demasiadas solicitudes. Espera unos minutos e inténtalo de nuevo.',
+    }),
   })
 );
 

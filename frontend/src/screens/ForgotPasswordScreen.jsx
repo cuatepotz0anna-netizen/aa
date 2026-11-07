@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Brand from '../components/Brand';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_URL, readApiResponse } from '../services/api';
+import { setSpanishValidityMessage } from '../utils/formValidation';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -28,21 +28,16 @@ export default function ForgotPasswordScreen() {
         }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message || 'No se pudo solicitar la recuperación.'
-        );
-      }
+      await readApiResponse(response, 'No se pudo solicitar la recuperación.');
 
       setMessage(
         'Si existe una cuenta con ese correo, recibirás instrucciones para restablecer tu contraseña.'
       );
     } catch (requestError) {
       setError(
-        requestError.message ||
-          'No se pudo conectar con el servidor. Intenta nuevamente.'
+        requestError instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Intenta nuevamente.'
+          : requestError.message || 'No se pudo solicitar la recuperación.'
       );
     } finally {
       setLoading(false);
@@ -78,6 +73,7 @@ export default function ForgotPasswordScreen() {
             placeholder="nombre@empresa.com"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
+            onInvalid={(event) => setSpanishValidityMessage(event, 'El correo electrónico')}
             required
           />
         </div>

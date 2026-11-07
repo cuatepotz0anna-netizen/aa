@@ -1,6 +1,8 @@
 const Order = require('./order.model');
 const Customer = require('../customers/customer.model');
 const StudioSession = require('../sessions/session.model');
+const validateNumericFields = require('../../utils/numericValidation');
+const { validatePersonNames } = require('../../utils/personNameValidation');
 
 const listOrders = async (req, res, next) => {
   try {
@@ -63,7 +65,24 @@ const createOrder = async (req, res, next) => {
     if (!date || !customer || !items) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required order fields',
+        message: 'Completa los campos obligatorios del pedido.',
+      });
+    }
+
+    const nameError = validatePersonNames([customer]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+
+    const numericError = validateNumericFields([
+      { value: productCount, label: 'La cantidad de productos', integer: true },
+      { value: total, label: 'El total' },
+    ]);
+
+    if (numericError) {
+      return res.status(400).json({
+        success: false,
+        message: numericError,
       });
     }
 
@@ -99,6 +118,12 @@ const createOrder = async (req, res, next) => {
 
 const updateOrder = async (req, res, next) => {
   try {
+    const { customer } = req.body || {};
+    const nameError = validatePersonNames([customer]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+
     const order = await Order.findOne({
       _id: req.params.id,
       createdBy: req.user._id,
@@ -115,7 +140,6 @@ const updateOrder = async (req, res, next) => {
     const {
       number,
       date,
-      customer,
       items,
       productCount,
       total,
@@ -123,6 +147,18 @@ const updateOrder = async (req, res, next) => {
       session,
       status,
     } = req.body || {};
+
+    const numericError = validateNumericFields([
+      { value: productCount, label: 'La cantidad de productos', integer: true },
+      { value: total, label: 'El total' },
+    ]);
+
+    if (numericError) {
+      return res.status(400).json({
+        success: false,
+        message: numericError,
+      });
+    }
 
     if (number !== undefined) order.number = String(number).trim();
     if (date !== undefined) order.date = String(date).trim();

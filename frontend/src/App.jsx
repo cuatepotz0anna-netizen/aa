@@ -9,6 +9,7 @@ import ResetPasswordScreen from './screens/ResetPasswordScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import LandingPage from './screens/LandingPage';
+import ChangePasswordScreen from './screens/ChangePasswordScreen';
 import Brand from './components/Brand';
 import { StudioDashboard, StudioModule } from './screens/StudioWorkspace';
 
@@ -140,6 +141,7 @@ function WorkspaceLayout() {
             <div className="account-dropdown">
               <p>Sesión iniciada como</p>
               <strong>{displayName}</strong>
+              <button type="button" onClick={() => navigate('/cambiar-contrasena')}>Cambiar contraseña</button>
               <button type="button" onClick={handleLogout}>Cerrar sesión</button>
             </div>
           </details>
@@ -228,6 +230,7 @@ export default function App() {
         <Route path="clientes" element={<StudioModule module="customers" />} />
         <Route path="asistencia" element={<StudioModule module="attendance" />} />
         <Route path="health" element={<Health />} />
+        <Route path="cambiar-contrasena" element={<ChangePasswordScreen />} />
       </Route>
       <Route path="*" element={<Navigate replace to="/" />} />
     </Routes>

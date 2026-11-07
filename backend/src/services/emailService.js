@@ -1,13 +1,14 @@
 const { Resend } = require('resend');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const EMAIL_FROM = process.env.EMAIL_FROM || 'onboarding@resend.dev';
 const EMAIL_TEST_TO = process.env.EMAIL_TEST_TO || null;
 
 async function sendEmail({ to, subject, html }) {
   if (!to) {
     throw new Error('Se requiere un destinatario para enviar el correo');
+  }
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('El servicio de correo no está configurado.');
   }
 
   const originalRecipient = to;
@@ -35,6 +36,7 @@ async function sendEmail({ to, subject, html }) {
       `
       : '';
 
+  const resend = new Resend(process.env.RESEND_API_KEY);
   const { data, error } = await resend.emails.send({
     from: `Foto Minerva <${EMAIL_FROM}>`,
     to: [finalRecipient],

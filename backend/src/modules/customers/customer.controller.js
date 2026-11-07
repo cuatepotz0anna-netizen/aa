@@ -1,4 +1,6 @@
 const Customer = require('./customer.model');
+const { validatePersonNames } = require('../../utils/personNameValidation');
+const { isValidPhone, PHONE_ERROR } = require('../../utils/phoneValidation');
 
 const listCustomers = async (req, res, next) => {
   try {
@@ -48,11 +50,19 @@ const createCustomer = async (req, res, next) => {
   try {
     const { name, phone = '', email = '', notes = '' } = req.body || {};
 
-    if (!name || !name.trim()) {
+    if (typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Customer name is required',
+        message: 'El nombre es obligatorio.',
       });
+    }
+
+    const nameError = validatePersonNames([name]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+    if (!isValidPhone(phone)) {
+      return res.status(400).json({ success: false, message: PHONE_ERROR });
     }
 
     const customer = await Customer.create({
@@ -77,6 +87,16 @@ const createCustomer = async (req, res, next) => {
 
 const updateCustomer = async (req, res, next) => {
   try {
+    const { name } = req.body || {};
+    const { phone } = req.body || {};
+    const nameError = validatePersonNames([name]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+    if (!isValidPhone(phone)) {
+      return res.status(400).json({ success: false, message: PHONE_ERROR });
+    }
+
     const customer = await Customer.findOne({
       _id: req.params.id,
       createdBy: req.user._id,
@@ -90,18 +110,9 @@ const updateCustomer = async (req, res, next) => {
       });
     }
 
-    const { name, phone, email, notes } = req.body || {};
+    const { email, notes } = req.body || {};
 
-    if (name !== undefined) {
-      if (!String(name).trim()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Customer name cannot be empty',
-        });
-      }
-
-      customer.name = String(name).trim();
-    }
+    if (name !== undefined) customer.name = String(name).trim();
 
     if (phone !== undefined) {
       customer.phone = String(phone || '').trim();
@@ -194,7 +205,7 @@ const seedDemoCustomers = async (req, res, next) => {
       const lastName = lastNames[index % lastNames.length];
 
       return {
-        name: `${firstName} ${lastName} ${index + 1}`,
+        name: `${firstName} ${lastName}`,
         phone: `246${String(1000000 + index).slice(-7)}`,
         email: `cliente${index + 1}@fotominerva.test`,
         notes: `Cliente demo ${index + 1} para pruebas de Foto Minerva`,

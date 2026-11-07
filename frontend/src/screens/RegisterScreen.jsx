@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { registerRequest } from '../services/authService';
 import { useAuth } from '../context/AuthContext';
 import Brand from '../components/Brand';
+import { isValidPersonName, PERSON_NAME_ERROR } from '../utils/personNameValidation';
+import { setSpanishValidityMessage } from '../utils/formValidation';
 
 export default function RegisterScreen() {
   const navigate = useNavigate();
@@ -13,13 +15,22 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
 
   const onChange = (event) => {
+    event.currentTarget.setCustomValidity('');
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   };
 
   const onSubmit = async (event) => {
     event.preventDefault();
+    if (!isValidPersonName(form.name)) {
+      setError(PERSON_NAME_ERROR);
+      return;
+    }
     if (form.password !== form.confirmPassword) {
       setError('Las contraseñas no coinciden.');
+      return;
+    }
+    if (form.password.length < 8 || form.password.length > 128) {
+      setError('La contraseña debe tener entre 8 y 128 caracteres.');
       return;
     }
     setLoading(true);
@@ -68,6 +79,7 @@ export default function RegisterScreen() {
             placeholder="Tu nombre"
             value={form.name}
             onChange={onChange}
+            onInvalid={(event) => setSpanishValidityMessage(event, 'El nombre')}
             required
           />
         </div>
@@ -82,6 +94,7 @@ export default function RegisterScreen() {
             placeholder="nombre@empresa.com"
             value={form.email}
             onChange={onChange}
+            onInvalid={(event) => setSpanishValidityMessage(event, 'El correo electrónico')}
             required
           />
         </div>
@@ -97,6 +110,9 @@ export default function RegisterScreen() {
               placeholder="Crea una contraseña"
               value={form.password}
               onChange={onChange}
+              onInvalid={(event) => setSpanishValidityMessage(event, 'La contraseña')}
+              minLength={8}
+              maxLength={128}
               required
             />
             <button
@@ -120,6 +136,7 @@ export default function RegisterScreen() {
             placeholder="Repite tu contraseña"
             value={form.confirmPassword}
             onChange={onChange}
+            onInvalid={(event) => setSpanishValidityMessage(event, 'La confirmación de contraseña')}
             required
           />
         </div>

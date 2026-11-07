@@ -1,4 +1,6 @@
 const User = require('./user.model');
+const { validatePersonNames } = require('../../utils/personNameValidation');
+const { isValidPassword, PASSWORD_ERROR } = require('../../utils/passwordValidation');
 
 const getUsers = async (req, res, next) => {
   try {
@@ -55,8 +57,16 @@ const createUser = async (req, res, next) => {
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Name, email and password are required',
+        message: 'El nombre, correo y contraseña son obligatorios.',
       });
+    }
+
+    const nameError = validatePersonNames([name]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+    if (!isValidPassword(password)) {
+      return res.status(400).json({ success: false, message: PASSWORD_ERROR });
     }
 
     const exists = await User.findOne({ email: email.toLowerCase() });
@@ -91,6 +101,11 @@ const createUser = async (req, res, next) => {
 
 const updateUser = async (req, res, next) => {
   try {
+    const nameError = validatePersonNames([req.body?.name]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+
     const isAdmin = req.user.role === 'ADMIN';
     const allowedFields = isAdmin
       ? ['name', 'email', 'role', 'companyId', 'branchId', 'isActive']
