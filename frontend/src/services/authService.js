@@ -55,3 +55,13 @@ export const logoutRequest = (token, refreshToken) =>
     },
     body: JSON.stringify({ refreshToken }),
   }, 'No se pudo cerrar la sesión en el servidor');
+
+export const changePasswordRequest = (token, currentPassword, newPassword) =>
+  requestJson('/auth/change-password', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  }, 'No se pudo actualizar la contraseña');

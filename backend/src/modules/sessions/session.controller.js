@@ -1,5 +1,7 @@
 const StudioSession = require('./session.model');
 const Customer = require('../customers/customer.model');
+const { validatePersonNames } = require('../../utils/personNameValidation');
+const isValidTime = require('../../utils/timeValidation');
 
 const listSessions = async (req, res, next) => {
   try {
@@ -61,7 +63,18 @@ const createSession = async (req, res, next) => {
     if (!customer || !date || !time || !type || !responsible || !location) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required session fields',
+        message: 'Completa los campos obligatorios de la sesión.',
+      });
+    }
+
+    const nameError = validatePersonNames([customer, responsible]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+    if (!isValidTime(String(time).trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ingresa una hora válida en formato HH:MM.',
       });
     }
 
@@ -91,6 +104,23 @@ const createSession = async (req, res, next) => {
 
 const updateSession = async (req, res, next) => {
   try {
+    const nameError = validatePersonNames([
+      req.body?.customer,
+      req.body?.responsible,
+    ]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+    if (
+      req.body?.time !== undefined &&
+      !isValidTime(String(req.body.time).trim())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ingresa una hora válida en formato HH:MM.',
+      });
+    }
+
     const session = await StudioSession.findOne({
       _id: req.params.id,
       createdBy: req.user._id,

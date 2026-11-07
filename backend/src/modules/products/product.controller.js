@@ -1,4 +1,5 @@
 const Product = require('./product.model');
+const validateNumericFields = require('../../utils/numericValidation');
 
 const listProducts = async (req, res, next) => {
   try {
@@ -58,14 +59,26 @@ const createProduct = async (req, res, next) => {
     if (!name || !String(name).trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Product name is required',
+        message: 'El nombre del producto es obligatorio.',
       });
     }
 
     if (!category) {
       return res.status(400).json({
         success: false,
-        message: 'Product category is required',
+        message: 'La categoría del producto es obligatoria.',
+      });
+    }
+
+    const numericError = validateNumericFields([
+      { value: price, label: 'El precio' },
+      { value: stock, label: 'La existencia', integer: true },
+    ]);
+
+    if (numericError) {
+      return res.status(400).json({
+        success: false,
+        message: numericError,
       });
     }
 
@@ -115,11 +128,23 @@ const updateProduct = async (req, res, next) => {
       availability,
     } = req.body || {};
 
+    const numericError = validateNumericFields([
+      { value: price, label: 'El precio' },
+      { value: stock, label: 'La existencia', integer: true },
+    ]);
+
+    if (numericError) {
+      return res.status(400).json({
+        success: false,
+        message: numericError,
+      });
+    }
+
     if (name !== undefined) {
       if (!String(name).trim()) {
         return res.status(400).json({
           success: false,
-          message: 'Product name cannot be empty',
+          message: 'El nombre del producto no puede estar vacío.',
         });
       }
 

@@ -1,4 +1,6 @@
 const Attendance = require('./attendance.model');
+const { validatePersonNames } = require('../../utils/personNameValidation');
+const isValidTime = require('../../utils/timeValidation');
 
 const listAttendance = async (req, res, next) => {
   try {
@@ -57,7 +59,22 @@ const createAttendance = async (req, res, next) => {
     if (!employee || !date) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required attendance fields',
+        message: 'Completa los campos obligatorios de asistencia.',
+      });
+    }
+
+    const nameError = validatePersonNames([employee]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+    if (
+      [checkIn, checkOut].some(
+        (time) => time && !isValidTime(String(time).trim())
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ingresa una hora válida en formato HH:MM.',
       });
     }
 
@@ -84,6 +101,21 @@ const createAttendance = async (req, res, next) => {
 
 const updateAttendance = async (req, res, next) => {
   try {
+    const nameError = validatePersonNames([req.body?.employee]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+    if (
+      [req.body?.checkIn, req.body?.checkOut].some(
+        (time) => time !== undefined && time !== '' && !isValidTime(String(time).trim())
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ingresa una hora válida en formato HH:MM.',
+      });
+    }
+
     const attendance = await Attendance.findOne({
       _id: req.params.id,
       createdBy: req.user._id,

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Brand from '../components/Brand';
 import { loginRequest } from '../services/authService';
+import { setSpanishValidityMessage } from '../utils/formValidation';
 
 export default function LoginScreen() {
   const navigate = useNavigate();
@@ -56,6 +57,7 @@ export default function LoginScreen() {
             placeholder="nombre@empresa.com"
             value={form.email}
             onChange={onChange}
+            onInvalid={(event) => setSpanishValidityMessage(event, 'El correo electrónico')}
             required
           />
           <div className="forgot-password-row">
@@ -76,6 +78,7 @@ export default function LoginScreen() {
               placeholder="Ingresa tu contraseña"
               value={form.password}
               onChange={onChange}
+              onInvalid={(event) => setSpanishValidityMessage(event, 'La contraseña')}
               required
             />
             <button

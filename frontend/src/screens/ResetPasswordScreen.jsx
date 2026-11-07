@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Brand from '../components/Brand';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_URL, readApiResponse } from '../services/api';
+import { setSpanishValidityMessage } from '../utils/formValidation';
 
 export default function ResetPasswordScreen() {
   const [searchParams] = useSearchParams();
@@ -31,6 +31,10 @@ export default function ResetPasswordScreen() {
       setError('Las contraseñas no coinciden.');
       return;
     }
+    if (password.length < 8 || password.length > 128) {
+      setError('La contraseña debe tener entre 8 y 128 caracteres.');
+      return;
+    }
 
     setLoading(true);
 
@@ -47,21 +51,16 @@ export default function ResetPasswordScreen() {
         }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message || 'No se pudo actualizar la contraseña.'
-        );
-      }
+      await readApiResponse(response, 'No se pudo actualizar la contraseña.');
 
       setMessage('Tu contraseña fue actualizada correctamente.');
       setPassword('');
       setConfirmPassword('');
     } catch (requestError) {
       setError(
-        requestError.message ||
-          'No se pudo conectar con el servidor. Intenta nuevamente.'
+        requestError instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Intenta nuevamente.'
+          : requestError.message || 'No se pudo actualizar la contraseña.'
       );
     } finally {
       setLoading(false);
@@ -95,6 +94,9 @@ export default function ResetPasswordScreen() {
             placeholder="Ingresa tu nueva contraseña"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            onInvalid={(event) => setSpanishValidityMessage(event, 'La contraseña')}
+            minLength={8}
+            maxLength={128}
             required
           />
         </div>
@@ -111,6 +113,9 @@ export default function ResetPasswordScreen() {
             placeholder="Repite tu nueva contraseña"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
+            onInvalid={(event) => setSpanishValidityMessage(event, 'La confirmación de contraseña')}
+            minLength={8}
+            maxLength={128}
             required
           />
         </div>

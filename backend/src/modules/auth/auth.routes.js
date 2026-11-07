@@ -5,6 +5,7 @@ const {
   forgotPassword,
   resetPassword,
   login,
+  changePassword,
   profile,
   refresh,
   logout,
@@ -17,7 +18,10 @@ const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many authentication attempts. Please try again later.',
+  handler: (req, res) => res.status(429).json({
+    success: false,
+    message: 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
+  }),
   skipSuccessfulRequests: true,
 });
 
@@ -27,6 +31,7 @@ router.post('/reset-password', authLimiter, resetPassword);
 router.post('/login', authLimiter, login);
 router.post('/refresh', authLimiter, refresh);
 router.get('/profile', protect, profile);
+router.post('/change-password', protect, changePassword);
 router.post('/logout', protect, logout);
 router.post('/logout/all', protect, logout);
 

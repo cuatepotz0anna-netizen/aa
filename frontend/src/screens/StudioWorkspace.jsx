@@ -14,6 +14,9 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { isValidPersonName, PERSON_NAME_ERROR } from '../utils/personNameValidation';
+import { isValidPhone, PHONE_ERROR } from '../utils/phoneValidation';
+import { setSpanishValidityMessage } from '../utils/formValidation';
 import './StudioWorkspace.css';
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV
   ? 'http://localhost:5000/api'
@@ -302,6 +305,7 @@ const entityConfig = {
       ['prints', 'Impresión asociada', 'text', false], ['session', 'Sesión asociada', 'text', false],
       ['status', 'Estado', 'select', true, ['En revisión', 'En impresión', 'Listo para entrega', 'Entregado']],
     ],
+    personNameFields: ['customer'],
     columns: [['number', 'Pedido'], ['date', 'Fecha'], ['customer', 'Cliente'], ['items', 'Artículos / servicios'], ['productCount', 'Cantidad'], ['total', 'Total'], ['status', 'Estado']],
   },
   products: {
@@ -329,6 +333,7 @@ const entityConfig = {
       ['location', 'Ubicación', 'text', true], ['status', 'Estado', 'select', true, ['Pendiente', 'Confirmada', 'En preparación', 'Realizada', 'Cancelada']],
       ['notes', 'Notas', 'textarea', false],
     ],
+    personNameFields: ['customer', 'responsible'],
     columns: [['date', 'Fecha'], ['time', 'Hora'], ['type', 'Sesión'], ['customer', 'Cliente'], ['location', 'Ubicación'], ['status', 'Estado']],
   },
   prints: {
@@ -344,6 +349,7 @@ const entityConfig = {
       ['finish', 'Acabado', 'text', true], ['date', 'Fecha', 'date', true],
       ['status', 'Estado', 'select', true, ['Pendiente', 'En producción', 'Revisión', 'Lista', 'Entregada']],
     ],
+    personNameFields: ['customer'],
     columns: [['format', 'Formato'], ['size', 'Tamaño'], ['quantity', 'Cantidad'], ['order', 'Pedido'], ['customer', 'Cliente'], ['status', 'Estado']],
   },
   customers: {
@@ -356,6 +362,8 @@ const entityConfig = {
       ['name', 'Nombre', 'text', true], ['phone', 'Teléfono', 'tel', false],
       ['email', 'Correo electrónico', 'email', false], ['notes', 'Observaciones', 'textarea', false],
     ],
+    personNameFields: ['name'],
+    phoneFields: ['phone'],
     columns: [['name', 'Cliente'], ['phone', 'Teléfono'], ['email', 'Correo'], ['notes', 'Observaciones']],
   },
   attendance: {
@@ -369,6 +377,7 @@ const entityConfig = {
       ['checkIn', 'Hora de entrada', 'time', true], ['checkOut', 'Hora de salida', 'time', false],
       ['status', 'Estado', 'select', true, ['Presente', 'Pendiente de salida', 'Jornada completada', 'Ausencia']],
     ],
+    personNameFields: ['employee'],
     columns: [['employee', 'Trabajador'], ['date', 'Fecha'], ['checkIn', 'Hora de entrada'], ['checkOut', 'Hora de salida'], ['status', 'Estado']],
   },
 };
@@ -415,22 +424,71 @@ function StatusBadge({ children }) {
 function RecordForm({ config, initial, onCancel, onSave }) {
   const [form, setForm] = useState(() => initial || Object.fromEntries(config.fields.map(([key]) => [key, key === 'date' ? today() : ''])));
   const update = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    config.personNameFields?.forEach((key) => {
+      const field = formElement.elements.namedItem(key);
+      if (field && !isValidPersonName(form[key] || '')) {
+        field.setCustomValidity(PERSON_NAME_ERROR);
+      }
+    });
+    config.phoneFields?.forEach((key) => {
+      const field = formElement.elements.namedItem(key);
+      if (field && !isValidPhone(form[key] ?? '')) {
+        field.setCustomValidity(PHONE_ERROR);
+      }
+    });
+    if (!formElement.reportValidity()) return;
+
+    const normalizedForm = { ...form };
+    config.personNameFields?.forEach((key) => {
+      normalizedForm[key] = normalizedForm[key].trim();
+    });
+    config.phoneFields?.forEach((key) => {
+      normalizedForm[key] = (normalizedForm[key] ?? '').trim();
+    });
+    onSave(normalizedForm);
+  };
 
   return (
-    <form className="studio-form" onSubmit={(event) => { event.preventDefault(); onSave(form); }}>
+    <form className="studio-form" onSubmit={handleSubmit}>
       <div className="studio-form-grid">
         {config.fields.map(([key, label, type, required, options]) => (
           <label className={`studio-field${type === 'textarea' ? ' studio-field-wide' : ''}`} key={key}>
             <span>{label}{required && <em aria-hidden="true"> *</em>}</span>
             {type === 'select' ? (
-              <select name={key} onChange={update} required={required} value={form[key] || ''}>
+              <select name={key} onChange={(event) => { event.currentTarget.setCustomValidity(''); update(event); }} onInvalid={(event) => setSpanishValidityMessage(event, label)} required={required} value={form[key] || ''}>
                 <option value="">Selecciona una opción</option>
                 {options.map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
             ) : type === 'textarea' ? (
-              <textarea name={key} onChange={update} required={required} rows={4} value={form[key] || ''} />
+              <textarea name={key} onChange={(event) => { event.currentTarget.setCustomValidity(''); update(event); }} onInvalid={(event) => setSpanishValidityMessage(event, label)} required={required} rows={4} value={form[key] ?? ''} />
             ) : (
-              <input min={type === 'number' ? '0' : undefined} name={key} onChange={update} required={required} type={type} value={form[key] || ''} />
+              <input
+                min={type === 'number' ? (key === 'quantity' ? 1 : 0) : undefined}
+                name={key}
+                onChange={(event) => {
+                  event.currentTarget.setCustomValidity('');
+                  update(event);
+                }}
+                pattern={type === 'tel' ? '[0-9]*' : undefined}
+                onInvalid={(event) => {
+                  if (config.phoneFields?.includes(key) && form[key] && !isValidPhone(form[key])) {
+                    event.currentTarget.setCustomValidity(PHONE_ERROR);
+                    return;
+                  }
+                  if (config.personNameFields?.includes(key) && form[key] && !isValidPersonName(form[key])) {
+                    event.currentTarget.setCustomValidity(PERSON_NAME_ERROR);
+                    return;
+                  }
+                  setSpanishValidityMessage(event, label);
+                }}
+                required={required}
+                step={type === 'number' && ['stock', 'productCount', 'quantity'].includes(key) ? 1 : type === 'number' ? 'any' : undefined}
+                type={type}
+                value={form[key] ?? ''}
+              />
             )}
           </label>
         ))}

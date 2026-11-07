@@ -1,5 +1,7 @@
 const Print = require('./print.model');
 const Order = require('../orders/order.model');
+const validateNumericFields = require('../../utils/numericValidation');
+const { validatePersonNames } = require('../../utils/personNameValidation');
 
 const listPrints = async (req, res, next) => {
   try {
@@ -61,7 +63,23 @@ const createPrint = async (req, res, next) => {
     if (!customer || !order || !format || !size || !finish || !date) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required print fields',
+        message: 'Completa los campos obligatorios de la impresión.',
+      });
+    }
+
+    const nameError = validatePersonNames([customer]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+
+    const numericError = validateNumericFields([
+      { value: quantity, label: 'La cantidad', minimum: 1, integer: true },
+    ]);
+
+    if (numericError) {
+      return res.status(400).json({
+        success: false,
+        message: numericError,
       });
     }
 
@@ -91,6 +109,11 @@ const createPrint = async (req, res, next) => {
 
 const updatePrint = async (req, res, next) => {
   try {
+    const nameError = validatePersonNames([req.body?.customer]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+
     const print = await Print.findOne({
       _id: req.params.id,
       createdBy: req.user._id,
@@ -114,6 +137,17 @@ const updatePrint = async (req, res, next) => {
       date,
       status,
     } = req.body || {};
+
+    const numericError = validateNumericFields([
+      { value: quantity, label: 'La cantidad', minimum: 1, integer: true },
+    ]);
+
+    if (numericError) {
+      return res.status(400).json({
+        success: false,
+        message: numericError,
+      });
+    }
 
     if (customer !== undefined) print.customer = String(customer).trim();
     if (order !== undefined) print.order = String(order).trim();

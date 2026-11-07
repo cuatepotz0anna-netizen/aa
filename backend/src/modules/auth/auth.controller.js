@@ -10,6 +10,8 @@ const {
   sendPasswordChangedEmail,
 } = require('../../services/emailService');
 const { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_TOKEN_TTL } = require('../../config/jwt');
+const { validatePersonNames } = require('../../utils/personNameValidation');
+const { isValidPassword, PASSWORD_ERROR } = require('../../utils/passwordValidation');
 
 
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
@@ -105,20 +107,28 @@ const issueSessionPair = async (user) => {
 
 const register = async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password } = req.body || {};
 
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Name, email and password are required',
+        message: 'El nombre, correo y contraseña son obligatorios.',
       });
+    }
+
+    const nameError = validatePersonNames([name]);
+    if (nameError) {
+      return res.status(400).json({ success: false, message: nameError });
+    }
+    if (!isValidPassword(password)) {
+      return res.status(400).json({ success: false, message: PASSWORD_ERROR });
     }
 
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(409).json({
         success: false,
-        message: 'User already exists',
+        message: 'Ya existe una cuenta con este correo.',
       });
     }
 
@@ -166,7 +176,7 @@ const forgotPassword = async (req, res, next) => {
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: 'Email is required',
+        message: 'El correo es obligatorio.',
       });
     }
 
@@ -181,8 +191,7 @@ const forgotPassword = async (req, res, next) => {
     if (!user) {
       return res.status(200).json({
         success: true,
-        message:
-          'If an account exists with that email, password reset instructions have been sent.',
+        message: 'Si existe una cuenta con ese correo, recibirás instrucciones para restablecer tu contraseña.',
       });
     }
 
@@ -217,8 +226,7 @@ const forgotPassword = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message:
-        'If an account exists with that email, password reset instructions have been sent.',
+      message: 'Si existe una cuenta con ese correo, recibirás instrucciones para restablecer tu contraseña.',
     });
   } catch (error) {
     next(error);
@@ -232,8 +240,12 @@ const resetPassword = async (req, res, next) => {
     if (!token || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Token, email and new password are required',
+        message: 'El token, correo y contraseña nueva son obligatorios.',
       });
+    }
+
+    if (!isValidPassword(password)) {
+      return res.status(400).json({ success: false, message: PASSWORD_ERROR });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -249,7 +261,7 @@ const resetPassword = async (req, res, next) => {
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: 'Password reset token is invalid or has expired',
+        message: 'El enlace para restablecer la contraseña no es válido o venció.',
       });
     }
 
@@ -272,7 +284,7 @@ const resetPassword = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Password updated successfully',
+      message: 'La contraseña se actualizó correctamente.',
     });
   } catch (error) {
     next(error);
@@ -286,7 +298,7 @@ const login = async (req, res, next) => {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Email and password are required',
+        message: 'El correo y la contraseña son obligatorios.',
       });
     }
 
@@ -295,7 +307,7 @@ const login = async (req, res, next) => {
     if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials',
+        message: 'El correo o la contraseña no son correctos.',
       });
     }
 
@@ -303,7 +315,7 @@ const login = async (req, res, next) => {
     if (!passwordMatches) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials',
+        message: 'El correo o la contraseña no son correctos.',
       });
     }
 
@@ -334,6 +346,40 @@ const profile = async (req, res) => {
       user: sanitizeUser(req.user),
     },
   });
+};
+
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'La contraseña actual y la nueva son obligatorias.',
+      });
+    }
+
+    if (!isValidPassword(newPassword)) {
+      return res.status(400).json({ success: false, message: PASSWORD_ERROR });
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
+      return res.status(400).json({
+        success: false,
+        message: 'La contraseña actual no es correcta.',
+      });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'La contraseña se actualizó correctamente.',
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const refresh = async (req, res, next) => {
@@ -452,6 +498,7 @@ module.exports = {
   forgotPassword,
   resetPassword,
   login,
+  changePassword,
   profile,
   refresh,
   logout,
